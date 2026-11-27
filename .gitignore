@@ -1,4 +1,8 @@
-node_modules/
+node_modules
+
+# Rust / Soroban build output
+target/
+test_snapshots/
 coverage/
 *.tsbuildinfo
 .DS_Store

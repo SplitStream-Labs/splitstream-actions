@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import process from 'node:process';
-import { Contract, Keypair, nativeToScVal, rpc, xdr } from '@stellar/stellar-sdk';
+import { Account, Contract, Keypair, nativeToScVal, rpc, xdr } from '@stellar/stellar-sdk';
 import {
   ledgerCloseTime,
   parseCycleInfo,
   queryCycleInfo,
   relayCycleRoot,
+  verifyPostedCycle,
 } from '../src/relay.js';
 import { networkPassphrase } from '../src/registry.js';
 
@@ -138,6 +139,99 @@ describe.skipIf(!runSubmit)('relay submit (testnet, state-changing)', () => {
     expect(result.status).toBe('SUCCESS');
     expect(result.hash).toMatch(/^[0-9a-f]{64}$/);
     expect(result.ledger).toBeGreaterThan(0);
+  });
+});
+
+describe('ledgerCloseTime (unit)', () => {
+  /** Stub RPC returning one ledger record. */
+  function ledgerServer(ledger: { sequence: number; ledgerCloseTime: string | number }) {
+    return {
+      getLedgers: async () => ({ ledgers: [ledger], oldestLedger: 1 }),
+    } as unknown as rpc.Server;
+  }
+
+  it('treats the RPC close time as unix seconds, not a date string', async () => {
+    await expect(
+      ledgerCloseTime(ledgerServer({ sequence: 42, ledgerCloseTime: '1757520000' }), 42),
+    ).resolves.toBe('2025-09-10T16:00:00.000Z');
+  });
+
+  it('accepts a numeric close time', async () => {
+    await expect(
+      ledgerCloseTime(ledgerServer({ sequence: 42, ledgerCloseTime: 1757520000 }), 42),
+    ).resolves.toBe('2025-09-10T16:00:00.000Z');
+  });
+
+  it('throws on a missing or unparseable close time', async () => {
+    await expect(
+      ledgerCloseTime(ledgerServer({ sequence: 42, ledgerCloseTime: 'not-a-time' }), 42),
+    ).rejects.toThrow(/unusable ledger close time/);
+  });
+
+  it('throws when the RPC returns no ledger for that sequence', async () => {
+    const empty = { getLedgers: async () => ({ ledgers: [], oldestLedger: 1 }) } as unknown as rpc.Server;
+    await expect(ledgerCloseTime(empty, 42)).rejects.toThrow(/no ledger 42/);
+  });
+});
+
+describe('verifyPostedCycle (unit)', () => {
+  const root = Buffer.alloc(32, 7);
+  const totalAmount = 5000000000n;
+  const ctx = {
+    vault: new Contract('CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM'),
+    sourcePubkey: Keypair.random().publicKey(),
+    networkPassphrase: networkPassphrase('testnet'),
+    cycleId: 4,
+    root,
+    totalAmount,
+  };
+
+  /** Minimal CycleInfo map, as soroban-sdk returns it from get_cycle_info. */
+  function cycleInfoMap(overrides: { root?: Buffer; total?: bigint; retval?: xdr.ScVal } = {}) {
+    if (overrides.retval !== undefined) return overrides.retval;
+    return xdr.ScVal.scvMap([
+      new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('root'), val: xdr.ScVal.scvBytes(overrides.root ?? root) }),
+      new xdr.ScMapEntry({
+        key: xdr.ScVal.scvSymbol('total_amount'),
+        val: nativeToScVal(overrides.total ?? totalAmount, { type: 'i128' }),
+      }),
+      new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('posted_at'), val: xdr.ScVal.scvU64(1757520000n) }),
+      new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('claims_started'), val: xdr.ScVal.scvBool(false) }),
+      new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('replaced'), val: xdr.ScVal.scvBool(false) }),
+    ]);
+  }
+
+  /** Stub RPC: load the source account, then return the supplied retval. */
+  function stubServer(retval: xdr.ScVal): rpc.Server {
+    return {
+      getAccount: async (pubkey: string) => new Account(pubkey, '1'),
+      simulateTransaction: async () => ({ result: { retval } }),
+    } as unknown as rpc.Server;
+  }
+
+  it('accepts a readback that matches the submitted root and total', async () => {
+    const info = await verifyPostedCycle({ ...ctx, server: stubServer(cycleInfoMap()) });
+    expect(info.root.equals(root)).toBe(true);
+    expect(info.totalAmount).toBe(totalAmount);
+    expect(info.postedAt).toBe(1757520000);
+  });
+
+  it('throws when the stored root differs from the submitted root', async () => {
+    await expect(
+      verifyPostedCycle({ ...ctx, server: stubServer(cycleInfoMap({ root: Buffer.alloc(32, 9) })) }),
+    ).rejects.toThrow(/on-chain root mismatch/);
+  });
+
+  it('throws when the stored total differs from the submitted total', async () => {
+    await expect(
+      verifyPostedCycle({ ...ctx, server: stubServer(cycleInfoMap({ total: 1n })) }),
+    ).rejects.toThrow(/on-chain total mismatch/);
+  });
+
+  it('throws when the cycle is missing on-chain', async () => {
+    await expect(
+      verifyPostedCycle({ ...ctx, server: stubServer(xdr.ScVal.scvVoid()) }),
+    ).rejects.toThrow(/returned no cycle/);
   });
 });
 

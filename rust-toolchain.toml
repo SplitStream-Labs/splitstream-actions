@@ -1,0 +1,10 @@
+# Toolchain setup for local development and CI.
+#
+# Soroban contracts must be compiled for the `wasm32v1-none` target. Declaring
+# it here means `rustup` installs it automatically on the first `cargo`
+# invocation inside the repository — no manual `rustup target add` needed.
+[toolchain]
+channel = "stable"
+targets = ["wasm32v1-none"]
+components = ["clippy", "rustfmt"]
+profile = "minimal"

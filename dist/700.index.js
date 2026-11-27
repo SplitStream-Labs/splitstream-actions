@@ -8,7 +8,7 @@ export const modules = {
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   sanitizeIdentifier: () => (/* binding */ sanitizeIdentifier)
 /* harmony export */ });
-/* unused harmony exports escapeStringLiteral, formatImports, formatJSDocComment, generateTypeImports, isNameReserved, isTupleStruct, parseTypeFromTypeDef, toCamelCase, toPascalCase */
+/* unused harmony exports escapeStringLiteral, formatImports, formatJSDocComment, generateTypeImports, isNameReserved, isTupleStruct, parseTypeFromTypeDef, propertyKey, toCamelCase, toPascalCase */
 function isNameReserved(name) {
   const reservedNames = [
     // Keywords
@@ -82,6 +82,12 @@ function sanitizeIdentifier(identifier) {
 }
 function escapeStringLiteral(str) {
   return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+}
+function propertyKey(rawName) {
+  return isIdentifier(rawName) ? rawName : `"${escapeStringLiteral(rawName)}"`;
+}
+function isIdentifier(name) {
+  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name);
 }
 function parseTypeFromTypeDef(typeDef, isFunctionInput = false) {
   switch (typeDef.type) {
@@ -376,6 +382,533 @@ class Err {
 
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/account.js
 var account = __webpack_require__(6676);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/keypair.js + 2 modules
+var keypair = __webpack_require__(8477);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/strkey.js + 7 modules
+var strkey = __webpack_require__(3697);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/hashing.js
+var hashing = __webpack_require__(7935);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-address-credentials.js
+var soroban_address_credentials = __webpack_require__(7050);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/hash-id-preimage-soroban-authorization-with-address.js
+var hash_id_preimage_soroban_authorization_with_address = __webpack_require__(5916);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/hash-id-preimage-soroban-authorization.js
+var hash_id_preimage_soroban_authorization = __webpack_require__(7256);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-address-credentials-with-delegates.js
+var soroban_address_credentials_with_delegates = __webpack_require__(3542);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-delegate-signature.js
+var soroban_delegate_signature = __webpack_require__(357);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 4 modules
+var sc_val = __webpack_require__(8497);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-authorization-entry.js
+var soroban_authorization_entry = __webpack_require__(2813);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-credentials.js + 1 modules
+var soroban_credentials = __webpack_require__(8133);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/hash-id-preimage.js + 1 modules
+var hash_id_preimage = __webpack_require__(9976);
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/auth.js
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const MUXED_CREDENTIAL_REASON = "cannot sign authorization entries; use its base address";
+function toScVal(value) {
+  if (sc_val/* ScVal */.wq.is(value)) return value;
+  if (typeof value !== "object" || value === null) return null;
+  const ctor = value.constructor;
+  if (ctor?.schema?.name !== sc_val/* ScVal */.wq.schema.name) return null;
+  const toXdrObject = value.toXdrObject;
+  if (typeof toXdrObject !== "function") return null;
+  try {
+    return sc_val/* ScVal */.wq.fromXdr(sc_val/* ScVal */.wq.schema.encode(toXdrObject.call(value)));
+  } catch {
+    return null;
+  }
+}
+async function authorizeEntry(entry, signer, validUntilLedgerSeq, networkPassphrase, forAddress) {
+  if (entry.credentials.type === "sorobanCredentialsSourceAccount") {
+    return entry;
+  }
+  const credentials = entry.credentials;
+  const addrAuth = getAddressCredentials(credentials);
+  if (addrAuth === null) {
+    throw new Error(`unsupported credential type ${credentials.type}`);
+  }
+  const addresses = collectSignatureNodes(credentials).map(
+    (node) => base_address/* Address */.p.fromScAddress(node.address)
+  );
+  addresses.forEach(
+    (address) => (0,base_address/* assertNotMuxed */.N)(address, MUXED_CREDENTIAL_REASON)
+  );
+  if (forAddress !== void 0 && !addresses.some((address) => address.toString() === forAddress)) {
+    throw new Error(
+      `the authorization entry has no credential node for address ${forAddress}`
+    );
+  }
+  const preimage = buildAuthorizationEntryPreimage(
+    entry,
+    validUntilLedgerSeq,
+    networkPassphrase
+  );
+  const payload = (0,hashing/* hash */.t)(preimage.toXdr());
+  let signatureScVal;
+  let targetAddress = forAddress;
+  let sigResult = null;
+  if (typeof signer === "function") {
+    sigResult = await signer(preimage, Uint8Array.from(payload));
+  }
+  if (sigResult !== null && typeof sigResult === "object" && "signatureScVal" in sigResult) {
+    const candidate = sigResult.signatureScVal;
+    const asScVal = toScVal(candidate);
+    if (asScVal === null) {
+      throw new TypeError(
+        `signatureScVal must be an xdr.ScVal, got ${candidate === null ? "null" : typeof candidate}`
+      );
+    }
+    signatureScVal = asScVal;
+    targetAddress ??= sigResult.address;
+  } else {
+    let signature;
+    let publicKey;
+    if (typeof signer === "function") {
+      if (sigResult !== null && typeof sigResult === "object" && "signature" in sigResult) {
+        signature = sigResult.signature;
+        publicKey = sigResult.publicKey;
+      } else if ((0,uint8array_extras/* isUint8Array */.mg)(sigResult)) {
+        signature = sigResult;
+        publicKey = targetAddress ?? base_address/* Address */.p.fromScAddress(addrAuth.address).toString();
+      } else {
+        throw new TypeError(
+          `SigningCallback must resolve to a Uint8Array, { signature, publicKey }, or { signatureScVal }; got ${sigResult === null ? "null" : typeof sigResult}`
+        );
+      }
+    } else {
+      signature = signer.sign(payload);
+      publicKey = signer.publicKey();
+    }
+    if (typeof publicKey !== "string") {
+      throw new TypeError(
+        `expected a public key string from the signer, got ${typeof publicKey}`
+      );
+    }
+    if (!(0,uint8array_extras/* isUint8Array */.mg)(signature)) {
+      throw new TypeError(
+        `expected a Uint8Array signature from the signer, got ${signature === null ? "null" : typeof signature}`
+      );
+    }
+    if (!strkey/* StrKey */.L8.isValidEd25519PublicKey(publicKey)) {
+      throw new TypeError(
+        strkey/* StrKey */.L8.isValidContract(publicKey) || strkey/* StrKey */.L8.isValidMuxedContract(publicKey) ? `cannot verify an Ed25519 signature against contract ${publicKey}; sign for a contract address with a callback returning { signatureScVal }, or with a custom \`authorizeEntry\` when signing through signAuthEntries` : `expected an Ed25519 public key (G...) to verify the signature against, got ${JSON.stringify(publicKey)}`
+      );
+    }
+    if (!keypair/* Keypair */.A.fromPublicKey(publicKey).verify(payload, signature)) {
+      throw new Error(`signature doesn't match payload`);
+    }
+    const sigScVal = (0,scval/* nativeToScVal */.o5)(
+      {
+        public_key: strkey/* StrKey */.L8.decodeEd25519PublicKey(publicKey),
+        signature
+      },
+      {
+        type: {
+          public_key: ["symbol", null],
+          signature: ["symbol", null]
+        }
+      }
+    );
+    signatureScVal = sc_val/* ScVal */.wq.scvVec([sigScVal]);
+  }
+  const { credentials: signedCredentials, matched } = applyExpirationAndSignature(
+    credentials,
+    validUntilLedgerSeq,
+    signatureScVal,
+    payload,
+    targetAddress
+  );
+  if (matched === 0) {
+    throw new Error(
+      `the authorization entry has no credential node for address ${targetAddress}`
+    );
+  }
+  return new soroban_authorization_entry/* SorobanAuthorizationEntry */.Q({
+    credentials: signedCredentials,
+    rootInvocation: entry.rootInvocation
+  });
+}
+function authorizeInvocation(params) {
+  const {
+    signer,
+    validUntilLedgerSeq,
+    invocation,
+    networkPassphrase,
+    publicKey = "",
+    authV2 = true
+  } = params;
+  const kp = Keypair.random().rawPublicKey();
+  const nonce = Int64(bytesToInt64(kp));
+  const pk = publicKey || (signer instanceof Keypair ? signer.publicKey() : null);
+  if (!pk) {
+    throw new Error(`authorizeInvocation requires publicKey parameter`);
+  }
+  const addressCredentials = new SorobanAddressCredentials({
+    address: credentialAddress(pk),
+    nonce,
+    signatureExpirationLedger: 0,
+    // replaced
+    signature: ScVal.scvVec([])
+    // replaced
+  });
+  const entry = new SorobanAuthorizationEntry({
+    rootInvocation: invocation,
+    credentials: authV2 ? SorobanCredentials.sorobanCredentialsAddressV2(addressCredentials) : SorobanCredentials.sorobanCredentialsAddress(addressCredentials)
+  });
+  return authorizeEntry(entry, signer, validUntilLedgerSeq, networkPassphrase);
+}
+function buildAuthorizationEntryPreimage(entry, validUntilLedgerSeq, networkPassphrase) {
+  const credentials = entry.credentials;
+  const addrAuth = getAddressCredentials(credentials);
+  if (addrAuth === null) {
+    throw new Error(
+      `cannot build a signature payload for credential type ${credentials.type}`
+    );
+  }
+  const networkId = (0,hashing/* hash */.t)(networkPassphrase);
+  switch (credentials.type) {
+    // legacy address credentials are not address-bound
+    case "sorobanCredentialsAddress":
+      return hash_id_preimage/* HashIdPreimage */.co.envelopeTypeSorobanAuthorization(
+        new hash_id_preimage_soroban_authorization/* HashIdPreimageSorobanAuthorization */.t({
+          networkId,
+          nonce: addrAuth.nonce,
+          invocation: entry.rootInvocation,
+          signatureExpirationLedger: validUntilLedgerSeq
+        })
+      );
+    // ADDRESS_V2 and ADDRESS_WITH_DELEGATES bind the address into the signed
+    // payload via the WithAddress preimage (CAP-71)
+    case "sorobanCredentialsAddressV2":
+    case "sorobanCredentialsAddressWithDelegates":
+      return hash_id_preimage/* HashIdPreimage */.co.envelopeTypeSorobanAuthorizationWithAddress(
+        new hash_id_preimage_soroban_authorization_with_address/* HashIdPreimageSorobanAuthorizationWithAddress */.T({
+          networkId,
+          nonce: addrAuth.nonce,
+          invocation: entry.rootInvocation,
+          address: addrAuth.address,
+          signatureExpirationLedger: validUntilLedgerSeq
+        })
+      );
+    default:
+      throw new Error(`unsupported credential type ${credentials.type}`);
+  }
+}
+function buildWithDelegatesEntry(params) {
+  const { entry, validUntilLedgerSeq, delegates, signature } = params;
+  const credentials = entry.credentials;
+  const addrAuth = getAddressCredentials(credentials);
+  if (addrAuth === null || credentials.type === "sorobanCredentialsAddressWithDelegates") {
+    throw new Error(
+      `buildWithDelegatesEntry expects ADDRESS or ADDRESS_V2 credentials, got ${credentials.type}`
+    );
+  }
+  assertNotMuxed(
+    Address.fromScAddress(addrAuth.address),
+    MUXED_CREDENTIAL_REASON
+  );
+  return new SorobanAuthorizationEntry({
+    rootInvocation: entry.rootInvocation,
+    credentials: SorobanCredentials.sorobanCredentialsAddressWithDelegates(
+      new SorobanAddressCredentialsWithDelegates({
+        addressCredentials: new SorobanAddressCredentials({
+          address: addrAuth.address,
+          nonce: addrAuth.nonce,
+          signatureExpirationLedger: validUntilLedgerSeq,
+          signature: signature ?? ScVal.scvVoid()
+        }),
+        delegates: buildDelegateNodes(delegates)
+      })
+    )
+  });
+}
+function credentialAddress(address) {
+  const addr = new Address(address);
+  assertNotMuxed(addr, MUXED_CREDENTIAL_REASON);
+  return addr.toScAddress();
+}
+function buildDelegateNodes(delegates) {
+  const nodes = delegates.map(
+    (delegate) => new SorobanDelegateSignature({
+      address: credentialAddress(delegate.address),
+      signature: delegate.signature ?? ScVal.scvVoid(),
+      nestedDelegates: buildDelegateNodes(delegate.nestedDelegates ?? [])
+    })
+  );
+  nodes.sort(
+    (a, b) => compareUint8Arrays(a.address.toXdr(), b.address.toXdr())
+  );
+  for (let i = 1; i < nodes.length; i++) {
+    if (compareUint8Arrays(
+      nodes[i - 1].address.toXdr(),
+      nodes[i].address.toXdr()
+    ) === 0) {
+      throw new Error(
+        `duplicate delegate address ${Address.fromScAddress(
+          nodes[i].address
+        ).toString()}`
+      );
+    }
+  }
+  return nodes;
+}
+function getAddressCredentials(credentials) {
+  switch (credentials.type) {
+    case "sorobanCredentialsAddress":
+      return credentials.address;
+    case "sorobanCredentialsAddressV2":
+      return credentials.addressV2;
+    case "sorobanCredentialsAddressWithDelegates":
+      return credentials.addressWithDelegates.addressCredentials;
+    default:
+      return null;
+  }
+}
+function applyExpirationAndSignature(credentials, validUntilLedgerSeq, signature, payload, forAddress) {
+  const topAddr = getAddressCredentials(credentials);
+  if (topAddr === null) {
+    return { credentials, matched: 0 };
+  }
+  let matched = 0;
+  const topIsTarget = forAddress === void 0 || base_address/* Address */.p.fromScAddress(topAddr.address).toString() === forAddress;
+  if (topIsTarget) {
+    matched++;
+  }
+  const stored = topAddr.signatureExpirationLedger;
+  const keepOther = (other) => {
+    if (stored === validUntilLedgerSeq || !signaturePresent(other)) {
+      return true;
+    }
+    if (stored !== 0) {
+      return false;
+    }
+    const pairs = parseEd25519Signatures(other);
+    return pairs === null || pairs.every(
+      (pair) => keypair/* Keypair */.A.fromPublicKey(pair.publicKey).verify(payload, pair.signature)
+    );
+  };
+  const newTopAddr = new soroban_address_credentials/* SorobanAddressCredentials */.l({
+    address: topAddr.address,
+    nonce: topAddr.nonce,
+    signatureExpirationLedger: validUntilLedgerSeq,
+    signature: topIsTarget ? signature : carryOver(topAddr.signature, keepOther)
+  });
+  switch (credentials.type) {
+    case "sorobanCredentialsAddress":
+      return {
+        credentials: soroban_credentials/* SorobanCredentials */.j5.sorobanCredentialsAddress(newTopAddr),
+        matched
+      };
+    case "sorobanCredentialsAddressV2":
+      return {
+        credentials: soroban_credentials/* SorobanCredentials */.j5.sorobanCredentialsAddressV2(newTopAddr),
+        matched
+      };
+    case "sorobanCredentialsAddressWithDelegates": {
+      const withDelegates = credentials.addressWithDelegates;
+      const newDelegates = forAddress === void 0 && stored === validUntilLedgerSeq ? withDelegates.delegates : rebuildDelegatesWithSignature(
+        withDelegates.delegates,
+        forAddress,
+        signature,
+        keepOther,
+        () => {
+          matched++;
+        }
+      );
+      return {
+        credentials: soroban_credentials/* SorobanCredentials */.j5.sorobanCredentialsAddressWithDelegates(
+          new soroban_address_credentials_with_delegates/* SorobanAddressCredentialsWithDelegates */.J({
+            addressCredentials: newTopAddr,
+            delegates: newDelegates
+          })
+        ),
+        matched
+      };
+    }
+    default:
+      return { credentials, matched };
+  }
+}
+function carryOver(signature, keep) {
+  return keep(signature) ? signature : sc_val/* ScVal */.wq.scvVoid();
+}
+function rebuildDelegatesWithSignature(delegates, forAddress, signature, keepOther, onMatch) {
+  return delegates.map((delegate) => {
+    const isMatch = forAddress !== void 0 && base_address/* Address */.p.fromScAddress(delegate.address).toString() === forAddress;
+    if (isMatch) {
+      onMatch();
+    }
+    return new soroban_delegate_signature/* SorobanDelegateSignature */.a({
+      address: delegate.address,
+      signature: isMatch ? signature : carryOver(delegate.signature, keepOther),
+      nestedDelegates: rebuildDelegatesWithSignature(
+        delegate.nestedDelegates,
+        forAddress,
+        signature,
+        keepOther,
+        onMatch
+      )
+    });
+  });
+}
+function inspectAuthEntry(entry) {
+  const credentials = entry.credentials;
+  const addrAuth = getAddressCredentials(credentials);
+  let credentialType;
+  switch (credentials.type) {
+    case "sorobanCredentialsSourceAccount":
+      credentialType = "sourceAccount";
+      break;
+    case "sorobanCredentialsAddress":
+      credentialType = "address";
+      break;
+    case "sorobanCredentialsAddressV2":
+      credentialType = "addressV2";
+      break;
+    case "sorobanCredentialsAddressWithDelegates":
+      credentialType = "addressWithDelegates";
+      break;
+    default:
+      throw new Error(
+        `unsupported credential type ${credentials.type}`
+      );
+  }
+  const signers = collectSignatureNodes(credentials).map(
+    (node) => ({
+      address: Address.fromScAddress(node.address).toString(),
+      signed: signaturePresent(node.signature),
+      signatures: parseEd25519Signatures(node.signature),
+      rawSignature: node.signature
+    })
+  );
+  return {
+    credentialType,
+    address: addrAuth === null ? null : Address.fromScAddress(addrAuth.address).toString(),
+    nonce: addrAuth === null ? null : addrAuth.nonce,
+    signatureExpirationLedger: addrAuth === null ? null : addrAuth.signatureExpirationLedger,
+    signers,
+    signed: signers.length > 0 && signers.every((signer) => signer.signed),
+    invocation: entry.rootInvocation
+  };
+}
+function collectSignatureNodes(credentials) {
+  const addrAuth = getAddressCredentials(credentials);
+  if (addrAuth === null) {
+    return [];
+  }
+  const nodes = [
+    { address: addrAuth.address, signature: addrAuth.signature }
+  ];
+  if (credentials.type === "sorobanCredentialsAddressWithDelegates") {
+    const walk = (delegates) => {
+      delegates.forEach((delegate) => {
+        nodes.push({
+          address: delegate.address,
+          signature: delegate.signature
+        });
+        walk(delegate.nestedDelegates);
+      });
+    };
+    walk(credentials.addressWithDelegates.delegates);
+  }
+  return nodes;
+}
+function checkAuthEntryReadiness(entry, currentLedgerSeq) {
+  if (!Number.isInteger(currentLedgerSeq) || currentLedgerSeq < 0 || currentLedgerSeq > 4294967295) {
+    throw new Error(
+      `currentLedgerSeq must be a uint32 ledger sequence, got ${currentLedgerSeq}`
+    );
+  }
+  const info = inspectAuthEntry(entry);
+  if (info.credentialType === "sourceAccount") {
+    return { ready: true, expired: false, unsignedBy: [] };
+  }
+  const expired = currentLedgerSeq >= (info.signatureExpirationLedger ?? 0);
+  const unsignedBy = info.signers.filter((signer) => !signer.signed).map((signer) => signer.address);
+  return { ready: !expired && unsignedBy.length === 0, expired, unsignedBy };
+}
+function signaturePresent(signature) {
+  switch (signature.type) {
+    case "scvVoid":
+      return false;
+    case "scvVec":
+      return (signature.value ?? []).length > 0;
+    default:
+      return true;
+  }
+}
+function parseEd25519Signatures(signature) {
+  if (signature.type !== "scvVec") {
+    return null;
+  }
+  const parsed = [];
+  for (const element of signature.value ?? []) {
+    if (element.type !== "scvMap") {
+      return null;
+    }
+    let publicKey = null;
+    let sig = null;
+    for (const mapEntry of element.value ?? []) {
+      const { key, val } = mapEntry;
+      if (key.type !== "scvSymbol" || val.type !== "scvBytes") {
+        return null;
+      }
+      switch (key.value.toString()) {
+        case "public_key":
+          publicKey = val.value.value;
+          break;
+        case "signature":
+          sig = val.value.value;
+          break;
+        default:
+          return null;
+      }
+    }
+    if (publicKey === null || sig === null || publicKey.length !== 32 || sig.length !== 64) {
+      return null;
+    }
+    parsed.push({
+      publicKey: strkey/* StrKey */.L8.encodeEd25519PublicKey(publicKey),
+      signature: sig
+    });
+  }
+  return parsed;
+}
+function bytesToInt64(bytes) {
+  const buf = bytes.subarray(0, 8);
+  if (buf.length < 8) {
+    throw new Error(
+      `need at least 8 bytes to convert to Int64, got ${bytes.length}`
+    );
+  }
+  const view = new DataView(buf.buffer, buf.byteOffset, 8);
+  const value = view.getBigInt64(0, false);
+  return value;
+}
+
+
+//# sourceMappingURL=auth.js.map
+
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/contract/types.js
 const DEFAULT_TIMEOUT = 5 * 60;
 const NULL_ACCOUNT = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
@@ -571,7 +1104,7 @@ class ScSpecTypeBytesN extends xdr_value/* XdrValue */.SD {
 class ScSpecTypeUdt extends xdr_value/* XdrValue */.SD {
   name;
   static schema = (0,js_xdr/* struct */.w3)("ScSpecTypeUdt", {
-    name: (0,xdr_string/* xdrString */.G)(60)
+    name: (0,xdr_string/* xdrString */.G)(1024)
   });
   constructor(input) {
     super();
@@ -1376,7 +1909,7 @@ class ScSpecUdtStructV0 extends xdr_value/* XdrValue */.SD {
     {
       doc: (0,xdr_string/* xdrString */.G)(1024),
       lib: (0,xdr_string/* xdrString */.G)(80),
-      name: (0,xdr_string/* xdrString */.G)(60),
+      name: (0,xdr_string/* xdrString */.G)(1024),
       fields: (0,js_xdr/* array */.YO)(ScSpecUdtStructFieldV0.schema, js_xdr/* UNBOUNDED_MAX_LENGTH */.dp)
     }
   );
@@ -1646,7 +2179,7 @@ class ScSpecUdtUnionV0 extends xdr_value/* XdrValue */.SD {
     {
       doc: (0,xdr_string/* xdrString */.G)(1024),
       lib: (0,xdr_string/* xdrString */.G)(80),
-      name: (0,xdr_string/* xdrString */.G)(60),
+      name: (0,xdr_string/* xdrString */.G)(1024),
       cases: (0,js_xdr/* array */.YO)(ScSpecUdtUnionCaseV0.schema, js_xdr/* UNBOUNDED_MAX_LENGTH */.dp)
     }
   );
@@ -1736,7 +2269,7 @@ class ScSpecUdtEnumV0 extends xdr_value/* XdrValue */.SD {
     {
       doc: (0,xdr_string/* xdrString */.G)(1024),
       lib: (0,xdr_string/* xdrString */.G)(80),
-      name: (0,xdr_string/* xdrString */.G)(60),
+      name: (0,xdr_string/* xdrString */.G)(1024),
       cases: (0,js_xdr/* array */.YO)(ScSpecUdtEnumCaseV0.schema, js_xdr/* UNBOUNDED_MAX_LENGTH */.dp)
     }
   );
@@ -1826,7 +2359,7 @@ class ScSpecUdtErrorEnumV0 extends xdr_value/* XdrValue */.SD {
     {
       doc: (0,xdr_string/* xdrString */.G)(1024),
       lib: (0,xdr_string/* xdrString */.G)(80),
-      name: (0,xdr_string/* xdrString */.G)(60),
+      name: (0,xdr_string/* xdrString */.G)(1024),
       cases: (0,js_xdr/* array */.YO)(ScSpecUdtErrorEnumCaseV0.schema, js_xdr/* UNBOUNDED_MAX_LENGTH */.dp)
     }
   );
@@ -2008,7 +2541,7 @@ class ScSpecEventV0 extends xdr_value/* XdrValue */.SD {
   static schema = (0,js_xdr/* struct */.w3)("ScSpecEventV0", {
     doc: (0,xdr_string/* xdrString */.G)(1024),
     lib: (0,xdr_string/* xdrString */.G)(80),
-    name: (0,xdr_string/* xdrString */.G)(32),
+    name: (0,xdr_string/* xdrString */.G)(1024),
     prefixTopics: (0,js_xdr/* array */.YO)((0,xdr_string/* xdrString */.G)(32), 2),
     params: (0,js_xdr/* array */.YO)(ScSpecEventParamV0.schema, js_xdr/* UNBOUNDED_MAX_LENGTH */.dp),
     dataFormat: ScSpecEventDataFormat.schema
@@ -2265,6 +2798,8 @@ const ScSpecEntry = ScSpecEntryBase;
 
 
 
+
+
 async function withExponentialBackoff(fn, keepWaitingIf, timeoutInSeconds, exponentialFactor = 1.5, verbose = false) {
   const attempts = [];
   let count = 0;
@@ -2331,6 +2866,10 @@ function parseWasmCustomSections(buffer) {
     throw new Error("Invalid WASM magic");
   if ([...read(4)].join() !== "1,0,0,0")
     throw new Error("Invalid WASM version");
+  const nameDecoder = new TextDecoder("utf-8", {
+    fatal: true,
+    ignoreBOM: true
+  });
   while (offset < buffer.byteLength) {
     const sectionId = read(1)[0];
     const sectionLength = readVarUint32();
@@ -2341,12 +2880,8 @@ function parseWasmCustomSections(buffer) {
         const nameBytes = read(nameLen);
         const payload = read(sectionLength - (offset - start));
         try {
-          const name = new TextDecoder("utf-8", { fatal: true }).decode(
-            nameBytes
-          );
-          if (payload.length > 0) {
-            sections.set(name, (sections.get(name) || []).concat(payload));
-          }
+          const name = nameDecoder.decode(nameBytes);
+          sections.set(name, (sections.get(name) || []).concat(payload));
         } catch {
         }
       }
@@ -2361,6 +2896,27 @@ function processSpecEntryStream(buffer) {
 async function getAccount(options, server) {
   return options.publicKey ? server.getAccount(options.publicKey) : new account/* Account */.g(NULL_ACCOUNT, "0");
 }
+const pendingAt = (address, signature, delegates, includeSigned) => {
+  const self = includeSigned || !signaturePresent(signature) ? [base_address/* Address */.p.fromScAddress(address).toString()] : [];
+  if (address.type !== "scAddressTypeContract") return self;
+  return [
+    ...self,
+    ...delegates.flatMap(
+      (d) => pendingAt(d.address, d.signature, d.nestedDelegates, includeSigned)
+    )
+  ];
+};
+function pendingSigners(credentials, { includeSigned = false, includeDelegates = true } = {}) {
+  const addrAuth = getAddressCredentials(credentials);
+  if (addrAuth === null) return [];
+  const delegates = includeDelegates && credentials.type === "sorobanCredentialsAddressWithDelegates" ? credentials.addressWithDelegates.delegates : [];
+  return pendingAt(
+    addrAuth.address,
+    addrAuth.signature,
+    delegates,
+    includeSigned
+  );
+}
 
 
 //# sourceMappingURL=utils.js.map
@@ -2371,7 +2927,12 @@ async function getAccount(options, server) {
 function specFromWasm(wasm) {
   const customData = parseWasmCustomSections(wasm);
   const xdrSections = customData.get("contractspecv0");
-  if (!xdrSections || xdrSections.length === 0) {
+  if (xdrSections && xdrSections.length > 1) {
+    throw new Error(
+      `Expected at most one 'contractspecv0' section in wasm, found ${xdrSections.length}`
+    );
+  }
+  if (!xdrSections || xdrSections[0].length === 0) {
     throw new Error("Could not obtain contract spec from wasm");
   }
   return Uint8Array.from(xdrSections[0]);
@@ -2380,10 +2941,7 @@ function specFromWasm(wasm) {
 
 //# sourceMappingURL=wasm_spec_parser.js.map
 
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 5 modules
-var sc_val = __webpack_require__(9679);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/contract/event_spec.js
-
 
 
 
@@ -2450,6 +3008,50 @@ function parseEvent(spec, entries, topics, data) {
     if (!tlParams) {
       continue;
     }
+    const dParams = dataParams(event);
+    const dataPairs = [];
+    switch (event.dataFormat.name) {
+      case "scSpecEventDataFormatSingleValue": {
+        const param = dParams[0];
+        if (param) {
+          dataPairs.push([param, dataVal]);
+        }
+        break;
+      }
+      case "scSpecEventDataFormatVec": {
+        if (dataVal.type !== "scvVec") {
+          continue;
+        }
+        const vec = dataVal.value ?? [];
+        if (vec.length < dParams.length) {
+          continue;
+        }
+        dParams.forEach((param, i) => {
+          dataPairs.push([param, vec[i]]);
+        });
+        break;
+      }
+      case "scSpecEventDataFormatMap": {
+        if (dataVal.type !== "scvMap") {
+          continue;
+        }
+        const map = dataVal.value ?? [];
+        dParams.forEach((param) => {
+          const name = param.name.toString();
+          const entry = map.find(
+            (e) => e.key.type === "scvSymbol" && e.key.value.toString() === name
+          );
+          if (entry) {
+            dataPairs.push([param, entry.val]);
+          }
+        });
+        break;
+      }
+      default: {
+        const unhandled = event.dataFormat.name;
+        throw new Error(`unknown event data format: ${unhandled}`);
+      }
+    }
     try {
       const prefixLen = event.prefixTopics.length;
       const dataOut = /* @__PURE__ */ Object.create(null);
@@ -2457,39 +3059,9 @@ function parseEvent(spec, entries, topics, data) {
         const val = topicVals[prefixLen + i];
         dataOut[param.name.toString()] = spec.scValToNative(val, param.type);
       });
-      const dParams = dataParams(event);
-      const format = event.dataFormat.value;
-      if (format === ScSpecEventDataFormat.scSpecEventDataFormatSingleValue.value) {
-        const param = dParams[0];
-        if (param) {
-          dataOut[param.name.toString()] = spec.scValToNative(
-            dataVal,
-            param.type
-          );
-        }
-      } else if (format === ScSpecEventDataFormat.scSpecEventDataFormatVec.value) {
-        const vec = (dataVal.type === "scvVec" ? dataVal.value : null) ?? [];
-        if (vec.length < dParams.length) {
-          continue;
-        }
-        dParams.forEach((param, i) => {
-          dataOut[param.name.toString()] = spec.scValToNative(
-            vec[i],
-            param.type
-          );
-        });
-      } else if (format === ScSpecEventDataFormat.scSpecEventDataFormatMap.value) {
-        const map = (dataVal.type === "scvMap" ? dataVal.value : null) ?? [];
-        dParams.forEach((param) => {
-          const name = param.name.toString();
-          const entry = map.find(
-            (e) => e.key.type === "scvSymbol" && e.key.value.toString() === name
-          );
-          if (entry) {
-            dataOut[name] = spec.scValToNative(entry.val, param.type);
-          }
-        });
-      }
+      dataPairs.forEach(([param, val]) => {
+        dataOut[param.name.toString()] = spec.scValToNative(val, param.type);
+      });
       return {
         name: event.name.toString(),
         data: dataOut
@@ -2530,6 +3102,7 @@ var xdr_large_int = __webpack_require__(7738);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-bytes.js
 var sc_bytes = __webpack_require__(5756);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/contract/spec.js
+
 
 
 
@@ -2601,6 +3174,13 @@ function findCase(name) {
     }
   };
 }
+function plainAddress(address) {
+  (0,base_address/* assertNotMuxed */.N)(
+    address,
+    "is not allowed for an Address parameter; the parameter must be MuxedAddress"
+  );
+  return address;
+}
 function stringToScVal(str, ty) {
   switch (ty) {
     case "scSpecTypeString":
@@ -2608,6 +3188,7 @@ function stringToScVal(str, ty) {
     case "scSpecTypeSymbol":
       return sc_val/* ScVal */.wq.scvSymbol(str);
     case "scSpecTypeAddress":
+      return plainAddress(base_address/* Address */.p.fromString(str)).toScVal();
     case "scSpecTypeMuxedAddress":
       return base_address/* Address */.p.fromString(str).toScVal();
     case "scSpecTypeU64":
@@ -2710,7 +3291,7 @@ const PRIMITIVE_DEFINITONS = {
   MuxedAddress: {
     type: "string",
     format: "address",
-    description: "Stellar public key with M prefix combining a G address and unique ID"
+    description: "Account or contract address, optionally muxed: an M address (G address plus ID) or W address (C address plus ID)"
   },
   ScString: {
     type: "string",
@@ -2985,6 +3566,7 @@ class Spec {
    * @param wasm - The contract's wasm binary as a Uint8Array.
    * @returns A Promise that resolves to a Spec instance.
    * @throws If the contract spec cannot be obtained from the provided wasm binary.
+   * @throws If the wasm binary has more than one `contractspecv0` section.
    */
   static fromWasm(wasm) {
     const spec = specFromWasm(wasm);
@@ -3135,6 +3717,9 @@ class Spec {
    * @throws if value cannot be converted to the given type
    */
   nativeToScVal(val, ty) {
+    if (typeof val === "function") {
+      throw new TypeError(`failed to convert typeof function (${val})`);
+    }
     const tyType = ty.type;
     if (tyType === "scSpecTypeUdt") {
       const udt = ty.value;
@@ -3165,21 +3750,18 @@ class Spec {
         if (sc_val/* ScVal */.wq.is(val)) {
           return val;
         }
-        if (val instanceof base_address/* Address */.p) {
-          if (ty.type !== "scSpecTypeAddress") {
-            throw new TypeError(
-              `Type ${ty} was not address, but value was Address`
-            );
+        if (val instanceof base_address/* Address */.p || val instanceof base_contract/* Contract */.N) {
+          const address = val instanceof base_contract/* Contract */.N ? val.address() : val;
+          switch (ty.type) {
+            case "scSpecTypeAddress":
+              return plainAddress(address).toScVal();
+            case "scSpecTypeMuxedAddress":
+              return address.toScVal();
+            default:
+              throw new TypeError(
+                `Type ${ty} was not address, but value was Address`
+              );
           }
-          return val.toScVal();
-        }
-        if (val instanceof base_contract/* Contract */.N) {
-          if (ty.type !== "scSpecTypeAddress") {
-            throw new TypeError(
-              `Type ${ty} was not address, but value was Address`
-            );
-          }
-          return val.address().toScVal();
         }
         if (val instanceof Uint8Array) {
           const copy = Uint8Array.from(val);
@@ -3317,8 +3899,6 @@ class Spec {
             );
         }
       }
-      case "function":
-        return this.nativeToScVal(val(), ty);
       default:
         throw new TypeError(`failed to convert typeof ${typeof val} (${val})`);
     }
@@ -3391,9 +3971,14 @@ class Spec {
     return sc_val/* ScVal */.wq.scvMap(
       fields.map((field) => {
         const name = field.name.toString();
+        const fieldVal = val[name];
+        const isInherited = typeof fieldVal === "function" && fieldVal === Reflect.get(Object.prototype, name) && !Object.hasOwn(val, name);
         return new sc_val/* ScMapEntry */.Dh({
           key: this.nativeToScVal(name, ScSpecTypeDef.scSpecTypeSymbol()),
-          val: this.nativeToScVal(val[name], field.type)
+          val: this.nativeToScVal(
+            isInherited ? void 0 : fieldVal,
+            field.type
+          )
         });
       })
     );
@@ -3658,10 +4243,11 @@ class Spec {
    *          no event spec matches (e.g. when filtering a mixed stream of
    *          events from multiple contracts/specs)
    *
-   * Note that matching compares only the prefix topics and the topic count;
-   * if two event specs share both (in particular, events with no prefix
-   * topics match on arity alone), the first declared spec whose values
-   * decode successfully wins.
+   * Note that matching compares only the prefix topics and a minimum topic
+   * count; if more than one event spec matches (in particular, events with
+   * no prefix topics match on arity alone), the first declared spec whose
+   * values decode successfully wins. A `vec` or `map` spec decodes only data
+   * of that container type.
    *
    * @example
    * ```ts
@@ -3763,486 +4349,8 @@ var rpc_server = __webpack_require__(9812);
 var transaction_builder = __webpack_require__(2931);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/sorobandata_builder.js
 var sorobandata_builder = __webpack_require__(7229);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/keypair.js + 2 modules
-var keypair = __webpack_require__(8477);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/strkey.js + 7 modules
-var strkey = __webpack_require__(3697);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/hashing.js
-var hashing = __webpack_require__(7935);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-address-credentials.js
-var soroban_address_credentials = __webpack_require__(7050);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/hash-id-preimage-soroban-authorization-with-address.js
-var hash_id_preimage_soroban_authorization_with_address = __webpack_require__(5916);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/hash-id-preimage-soroban-authorization.js
-var hash_id_preimage_soroban_authorization = __webpack_require__(7256);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-address-credentials-with-delegates.js
-var soroban_address_credentials_with_delegates = __webpack_require__(3542);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-delegate-signature.js
-var soroban_delegate_signature = __webpack_require__(357);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-authorization-entry.js
-var soroban_authorization_entry = __webpack_require__(2813);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-credentials.js + 1 modules
-var soroban_credentials = __webpack_require__(8133);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/hash-id-preimage.js + 1 modules
-var hash_id_preimage = __webpack_require__(9976);
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/auth.js
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-function toScVal(value) {
-  if (sc_val/* ScVal */.wq.is(value)) return value;
-  if (typeof value !== "object" || value === null) return null;
-  const ctor = value.constructor;
-  if (ctor?.schema?.name !== sc_val/* ScVal */.wq.schema.name) return null;
-  const toXdrObject = value.toXdrObject;
-  if (typeof toXdrObject !== "function") return null;
-  try {
-    return sc_val/* ScVal */.wq.fromXdr(sc_val/* ScVal */.wq.schema.encode(toXdrObject.call(value)));
-  } catch {
-    return null;
-  }
-}
-async function authorizeEntry(entry, signer, validUntilLedgerSeq, networkPassphrase, forAddress) {
-  if (entry.credentials.type === "sorobanCredentialsSourceAccount") {
-    return entry;
-  }
-  const credentials = entry.credentials;
-  const addrAuth = getAddressCredentials(credentials);
-  if (addrAuth === null) {
-    throw new Error(`unsupported credential type ${credentials.type}`);
-  }
-  const preimage = buildAuthorizationEntryPreimage(
-    entry,
-    validUntilLedgerSeq,
-    networkPassphrase
-  );
-  const payload = (0,hashing/* hash */.t)(preimage.toXdr());
-  let signatureScVal;
-  let targetAddress = forAddress;
-  let sigResult = null;
-  if (typeof signer === "function") {
-    sigResult = await signer(preimage, Uint8Array.from(payload));
-  }
-  if (sigResult !== null && typeof sigResult === "object" && "signatureScVal" in sigResult) {
-    const candidate = sigResult.signatureScVal;
-    const asScVal = toScVal(candidate);
-    if (asScVal === null) {
-      throw new TypeError(
-        `signatureScVal must be an xdr.ScVal, got ${candidate === null ? "null" : typeof candidate}`
-      );
-    }
-    signatureScVal = asScVal;
-    targetAddress ??= sigResult.address;
-  } else {
-    let signature;
-    let publicKey;
-    if (typeof signer === "function") {
-      if (sigResult !== null && typeof sigResult === "object" && "signature" in sigResult) {
-        signature = sigResult.signature;
-        publicKey = sigResult.publicKey;
-      } else if ((0,uint8array_extras/* isUint8Array */.mg)(sigResult)) {
-        signature = sigResult;
-        publicKey = base_address/* Address */.p.fromScAddress(addrAuth.address).toString();
-      } else {
-        throw new TypeError(
-          `SigningCallback must resolve to a Uint8Array, { signature, publicKey }, or { signatureScVal }; got ${sigResult === null ? "null" : typeof sigResult}`
-        );
-      }
-    } else {
-      signature = signer.sign(payload);
-      publicKey = signer.publicKey();
-    }
-    if (typeof publicKey !== "string") {
-      throw new TypeError(
-        `expected a public key string from the signer, got ${typeof publicKey}`
-      );
-    }
-    if (!(0,uint8array_extras/* isUint8Array */.mg)(signature)) {
-      throw new TypeError(
-        `expected a Uint8Array signature from the signer, got ${signature === null ? "null" : typeof signature}`
-      );
-    }
-    if (!keypair/* Keypair */.A.fromPublicKey(publicKey).verify(payload, signature)) {
-      throw new Error(`signature doesn't match payload`);
-    }
-    const sigScVal = (0,scval/* nativeToScVal */.o5)(
-      {
-        public_key: strkey/* StrKey */.L8.decodeEd25519PublicKey(publicKey),
-        signature
-      },
-      {
-        type: {
-          public_key: ["symbol", null],
-          signature: ["symbol", null]
-        }
-      }
-    );
-    signatureScVal = sc_val/* ScVal */.wq.scvVec([sigScVal]);
-  }
-  const { credentials: signedCredentials, matched } = applyExpirationAndSignature(
-    credentials,
-    validUntilLedgerSeq,
-    signatureScVal,
-    targetAddress
-  );
-  if (matched === 0) {
-    throw new Error(
-      `the authorization entry has no credential node for address ${targetAddress}`
-    );
-  }
-  return new soroban_authorization_entry/* SorobanAuthorizationEntry */.Q({
-    credentials: signedCredentials,
-    rootInvocation: entry.rootInvocation
-  });
-}
-function authorizeInvocation(params) {
-  const {
-    signer,
-    validUntilLedgerSeq,
-    invocation,
-    networkPassphrase,
-    publicKey = "",
-    authV2 = true
-  } = params;
-  const kp = Keypair.random().rawPublicKey();
-  const nonce = Int64(bytesToInt64(kp));
-  const pk = publicKey || (signer instanceof Keypair ? signer.publicKey() : null);
-  if (!pk) {
-    throw new Error(`authorizeInvocation requires publicKey parameter`);
-  }
-  const addressCredentials = new SorobanAddressCredentials({
-    address: new Address(pk).toScAddress(),
-    nonce,
-    signatureExpirationLedger: 0,
-    // replaced
-    signature: ScVal.scvVec([])
-    // replaced
-  });
-  const entry = new SorobanAuthorizationEntry({
-    rootInvocation: invocation,
-    credentials: authV2 ? SorobanCredentials.sorobanCredentialsAddressV2(addressCredentials) : SorobanCredentials.sorobanCredentialsAddress(addressCredentials)
-  });
-  return authorizeEntry(entry, signer, validUntilLedgerSeq, networkPassphrase);
-}
-function buildAuthorizationEntryPreimage(entry, validUntilLedgerSeq, networkPassphrase) {
-  const credentials = entry.credentials;
-  const addrAuth = getAddressCredentials(credentials);
-  if (addrAuth === null) {
-    throw new Error(
-      `cannot build a signature payload for credential type ${credentials.type}`
-    );
-  }
-  const networkId = (0,hashing/* hash */.t)(networkPassphrase);
-  switch (credentials.type) {
-    // legacy address credentials are not address-bound
-    case "sorobanCredentialsAddress":
-      return hash_id_preimage/* HashIdPreimage */.co.envelopeTypeSorobanAuthorization(
-        new hash_id_preimage_soroban_authorization/* HashIdPreimageSorobanAuthorization */.t({
-          networkId,
-          nonce: addrAuth.nonce,
-          invocation: entry.rootInvocation,
-          signatureExpirationLedger: validUntilLedgerSeq
-        })
-      );
-    // ADDRESS_V2 and ADDRESS_WITH_DELEGATES bind the address into the signed
-    // payload via the WithAddress preimage (CAP-71)
-    case "sorobanCredentialsAddressV2":
-    case "sorobanCredentialsAddressWithDelegates":
-      return hash_id_preimage/* HashIdPreimage */.co.envelopeTypeSorobanAuthorizationWithAddress(
-        new hash_id_preimage_soroban_authorization_with_address/* HashIdPreimageSorobanAuthorizationWithAddress */.T({
-          networkId,
-          nonce: addrAuth.nonce,
-          invocation: entry.rootInvocation,
-          address: addrAuth.address,
-          signatureExpirationLedger: validUntilLedgerSeq
-        })
-      );
-    default:
-      throw new Error(`unsupported credential type ${credentials.type}`);
-  }
-}
-function buildWithDelegatesEntry(params) {
-  const { entry, validUntilLedgerSeq, delegates, signature } = params;
-  const credentials = entry.credentials;
-  const addrAuth = getAddressCredentials(credentials);
-  if (addrAuth === null || credentials.type === "sorobanCredentialsAddressWithDelegates") {
-    throw new Error(
-      `buildWithDelegatesEntry expects ADDRESS or ADDRESS_V2 credentials, got ${credentials.type}`
-    );
-  }
-  return new SorobanAuthorizationEntry({
-    rootInvocation: entry.rootInvocation,
-    credentials: SorobanCredentials.sorobanCredentialsAddressWithDelegates(
-      new SorobanAddressCredentialsWithDelegates({
-        addressCredentials: new SorobanAddressCredentials({
-          address: addrAuth.address,
-          nonce: addrAuth.nonce,
-          signatureExpirationLedger: validUntilLedgerSeq,
-          signature: signature ?? ScVal.scvVoid()
-        }),
-        delegates: buildDelegateNodes(delegates)
-      })
-    )
-  });
-}
-function buildDelegateNodes(delegates) {
-  const nodes = delegates.map(
-    (delegate) => new SorobanDelegateSignature({
-      address: new Address(delegate.address).toScAddress(),
-      signature: delegate.signature ?? ScVal.scvVoid(),
-      nestedDelegates: buildDelegateNodes(delegate.nestedDelegates ?? [])
-    })
-  );
-  nodes.sort(
-    (a, b) => compareUint8Arrays(a.address.toXdr(), b.address.toXdr())
-  );
-  for (let i = 1; i < nodes.length; i++) {
-    if (compareUint8Arrays(
-      nodes[i - 1].address.toXdr(),
-      nodes[i].address.toXdr()
-    ) === 0) {
-      throw new Error(
-        `duplicate delegate address ${Address.fromScAddress(
-          nodes[i].address
-        ).toString()}`
-      );
-    }
-  }
-  return nodes;
-}
-function getAddressCredentials(credentials) {
-  switch (credentials.type) {
-    case "sorobanCredentialsAddress":
-      return credentials.address;
-    case "sorobanCredentialsAddressV2":
-      return credentials.addressV2;
-    case "sorobanCredentialsAddressWithDelegates":
-      return credentials.addressWithDelegates.addressCredentials;
-    default:
-      return null;
-  }
-}
-function applyExpirationAndSignature(credentials, validUntilLedgerSeq, signature, forAddress) {
-  const topAddr = getAddressCredentials(credentials);
-  if (topAddr === null) {
-    return { credentials, matched: 0 };
-  }
-  let matched = 0;
-  const topIsTarget = forAddress === void 0 || base_address/* Address */.p.fromScAddress(topAddr.address).toString() === forAddress;
-  if (topIsTarget) {
-    matched++;
-  }
-  const newTopAddr = new soroban_address_credentials/* SorobanAddressCredentials */.l({
-    address: topAddr.address,
-    nonce: topAddr.nonce,
-    signatureExpirationLedger: validUntilLedgerSeq,
-    signature: topIsTarget ? signature : topAddr.signature
-  });
-  switch (credentials.type) {
-    case "sorobanCredentialsAddress":
-      return {
-        credentials: soroban_credentials/* SorobanCredentials */.j5.sorobanCredentialsAddress(newTopAddr),
-        matched
-      };
-    case "sorobanCredentialsAddressV2":
-      return {
-        credentials: soroban_credentials/* SorobanCredentials */.j5.sorobanCredentialsAddressV2(newTopAddr),
-        matched
-      };
-    case "sorobanCredentialsAddressWithDelegates": {
-      const withDelegates = credentials.addressWithDelegates;
-      const newDelegates = forAddress === void 0 ? withDelegates.delegates : rebuildDelegatesWithSignature(
-        withDelegates.delegates,
-        forAddress,
-        signature,
-        () => {
-          matched++;
-        }
-      );
-      return {
-        credentials: soroban_credentials/* SorobanCredentials */.j5.sorobanCredentialsAddressWithDelegates(
-          new soroban_address_credentials_with_delegates/* SorobanAddressCredentialsWithDelegates */.J({
-            addressCredentials: newTopAddr,
-            delegates: newDelegates
-          })
-        ),
-        matched
-      };
-    }
-    default:
-      return { credentials, matched };
-  }
-}
-function rebuildDelegatesWithSignature(delegates, forAddress, signature, onMatch) {
-  return delegates.map((delegate) => {
-    const isMatch = base_address/* Address */.p.fromScAddress(delegate.address).toString() === forAddress;
-    if (isMatch) {
-      onMatch();
-    }
-    return new soroban_delegate_signature/* SorobanDelegateSignature */.a({
-      address: delegate.address,
-      signature: isMatch ? signature : delegate.signature,
-      nestedDelegates: rebuildDelegatesWithSignature(
-        delegate.nestedDelegates,
-        forAddress,
-        signature,
-        onMatch
-      )
-    });
-  });
-}
-function inspectAuthEntry(entry) {
-  const credentials = entry.credentials;
-  const addrAuth = getAddressCredentials(credentials);
-  let credentialType;
-  switch (credentials.type) {
-    case "sorobanCredentialsSourceAccount":
-      credentialType = "sourceAccount";
-      break;
-    case "sorobanCredentialsAddress":
-      credentialType = "address";
-      break;
-    case "sorobanCredentialsAddressV2":
-      credentialType = "addressV2";
-      break;
-    case "sorobanCredentialsAddressWithDelegates":
-      credentialType = "addressWithDelegates";
-      break;
-    default:
-      throw new Error(
-        `unsupported credential type ${credentials.type}`
-      );
-  }
-  const signers = collectSignatureNodes(credentials).map(
-    (node) => ({
-      address: base_address/* Address */.p.fromScAddress(node.address).toString(),
-      signed: signaturePresent(node.signature),
-      signatures: parseEd25519Signatures(node.signature),
-      rawSignature: node.signature
-    })
-  );
-  return {
-    credentialType,
-    address: addrAuth === null ? null : base_address/* Address */.p.fromScAddress(addrAuth.address).toString(),
-    nonce: addrAuth === null ? null : addrAuth.nonce,
-    signatureExpirationLedger: addrAuth === null ? null : addrAuth.signatureExpirationLedger,
-    signers,
-    signed: signers.length > 0 && signers.every((signer) => signer.signed),
-    invocation: entry.rootInvocation
-  };
-}
-function collectSignatureNodes(credentials) {
-  const addrAuth = getAddressCredentials(credentials);
-  if (addrAuth === null) {
-    return [];
-  }
-  const nodes = [
-    { address: addrAuth.address, signature: addrAuth.signature }
-  ];
-  if (credentials.type === "sorobanCredentialsAddressWithDelegates") {
-    const walk = (delegates) => {
-      delegates.forEach((delegate) => {
-        nodes.push({
-          address: delegate.address,
-          signature: delegate.signature
-        });
-        walk(delegate.nestedDelegates);
-      });
-    };
-    walk(credentials.addressWithDelegates.delegates);
-  }
-  return nodes;
-}
-function checkAuthEntryReadiness(entry, currentLedgerSeq) {
-  if (!Number.isInteger(currentLedgerSeq) || currentLedgerSeq < 0 || currentLedgerSeq > 4294967295) {
-    throw new Error(
-      `currentLedgerSeq must be a uint32 ledger sequence, got ${currentLedgerSeq}`
-    );
-  }
-  const info = inspectAuthEntry(entry);
-  if (info.credentialType === "sourceAccount") {
-    return { ready: true, expired: false, unsignedBy: [] };
-  }
-  const expired = currentLedgerSeq >= (info.signatureExpirationLedger ?? 0);
-  const unsignedBy = info.signers.filter((signer) => !signer.signed).map((signer) => signer.address);
-  return { ready: !expired && unsignedBy.length === 0, expired, unsignedBy };
-}
-function signaturePresent(signature) {
-  switch (signature.type) {
-    case "scvVoid":
-      return false;
-    case "scvVec":
-      return (signature.value ?? []).length > 0;
-    default:
-      return true;
-  }
-}
-function parseEd25519Signatures(signature) {
-  if (signature.type !== "scvVec") {
-    return null;
-  }
-  const parsed = [];
-  for (const element of signature.value ?? []) {
-    if (element.type !== "scvMap") {
-      return null;
-    }
-    let publicKey = null;
-    let sig = null;
-    for (const mapEntry of element.value ?? []) {
-      const { key, val } = mapEntry;
-      if (key.type !== "scvSymbol" || val.type !== "scvBytes") {
-        return null;
-      }
-      switch (key.value.toString()) {
-        case "public_key":
-          publicKey = val.value.value;
-          break;
-        case "signature":
-          sig = val.value.value;
-          break;
-        default:
-          return null;
-      }
-    }
-    if (publicKey === null || sig === null || publicKey.length !== 32 || sig.length !== 64) {
-      return null;
-    }
-    parsed.push({
-      publicKey: strkey/* StrKey */.L8.encodeEd25519PublicKey(publicKey),
-      signature: sig
-    });
-  }
-  return parsed;
-}
-function bytesToInt64(bytes) {
-  const buf = bytes.subarray(0, 8);
-  if (buf.length < 8) {
-    throw new Error(
-      `need at least 8 bytes to convert to Int64, got ${bytes.length}`
-    );
-  }
-  const view = new DataView(buf.buffer, buf.byteOffset, 8);
-  const value = view.getBigInt64(0, false);
-  return value;
-}
-
-
-//# sourceMappingURL=auth.js.map
-
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/util/decode_encode_muxed_account.js
+var decode_encode_muxed_account = __webpack_require__(4473);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/contract/signer.js
 
 
@@ -4316,6 +4424,20 @@ function signerAddress(value) {
     return value.address;
   }
   return isKeypairLike(value) ? value.publicKey() : void 0;
+}
+function walletSigningKey(signerAddress2) {
+  if (signerAddress2 == null || signerAddress2 === "") return void 0;
+  if (typeof signerAddress2 !== "string") {
+    throw new TypeError(
+      `expected the wallet's signerAddress to be a string, got ${typeof signerAddress2}`
+    );
+  }
+  if (strkey/* StrKey */.L8.isValidEd25519PublicKey(signerAddress2) || strkey/* StrKey */.L8.isValidMed25519PublicKey(signerAddress2)) {
+    return (0,decode_encode_muxed_account/* extractBaseAddress */.Rm)(signerAddress2);
+  }
+  throw new TypeError(
+    strkey/* StrKey */.L8.isValidContract(signerAddress2) || strkey/* StrKey */.L8.isValidMuxedContract(signerAddress2) ? `the wallet's signerAddress names contract ${signerAddress2}, but the default authorizer verifies Ed25519 signatures only; sign for a contract account with a custom \`authorizeEntry\`` : `expected the wallet's signerAddress to be an account address (G... or M...), got ${JSON.stringify(signerAddress2)}`
+  );
 }
 function toSignTransaction(value, networkPassphrase) {
   if (value == null) return void 0;
@@ -4521,10 +4643,7 @@ class Watcher {
 
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-transaction-data.js
 var soroban_transaction_data = __webpack_require__(9434);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/transaction-envelope.js
-var transaction_envelope = __webpack_require__(9675);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/contract/assembled_transaction.js
-
 
 
 
@@ -4573,7 +4692,7 @@ class AssembledTransaction {
    *   { args: 'for', my: 'method', ... },
    *   { simulate: false }
    * );
-   * tx.raw.addMemo(Memo.text('Nice memo, friend!'))
+   * tx.raw.setLedgerbounds(0, latestLedger + 100)
    * await tx.simulate();
    * ```
    */
@@ -4769,9 +4888,8 @@ class AssembledTransaction {
    * Deserialize the AssembledTransaction from a base64-encoded XDR string.
    */
   static fromXdr(options, encodedXDR, spec) {
-    const envelope = transaction_envelope/* TransactionEnvelope */.BB.fromXdr(encodedXDR, "base64");
     const built = transaction_builder/* TransactionBuilder */.Qc.fromXdr(
-      envelope,
+      encodedXDR,
       options.networkPassphrase
     );
     const invokeContractArgs = AssembledTransaction.validateInvokeContractOp(
@@ -4879,10 +4997,10 @@ class AssembledTransaction {
     if (options.simulate) await tx.simulate();
     return tx;
   }
-  static async buildFootprintRestoreTransaction(options, sorobanData, account, fee) {
+  static async buildFootprintRestoreTransaction(options, sorobanData, account) {
     const tx = new AssembledTransaction(options);
     tx.raw = new transaction_builder/* TransactionBuilder */.Qc(account, {
-      fee,
+      fee: options.fee ?? transaction_builder/* BASE_FEE */.hJ,
       networkPassphrase: options.networkPassphrase
     }).setSorobanData(
       sorobanData instanceof sorobandata_builder/* SorobanDataBuilder */.W ? sorobanData.build() : sorobanData
@@ -5003,7 +5121,8 @@ You can set \`restore\` to true in the method options in order to automatically 
    */
   sign = async ({
     force = false,
-    signTransaction = this.options.signTransaction
+    signTransaction = this.options.signTransaction,
+    ignoreContractDelegates = false
   } = {}) => {
     if (!this.built) {
       throw new Error("Transaction has not yet been simulated");
@@ -5027,9 +5146,9 @@ You can set \`restore\` to true in the method options in order to automatically 
         "This transaction was constructed using a default account. Provide a valid publicKey in the AssembledTransactionOptions."
       );
     }
-    const sigsNeeded = this.needsNonInvokerSigningBy().filter(
-      (id) => !id.startsWith("C")
-    );
+    const sigsNeeded = this.unsignedAddresses({
+      includeDelegates: !ignoreContractDelegates
+    }).filter((id) => !id.startsWith("C"));
     if (sigsNeeded.length) {
       throw new AssembledTransaction.Errors.NeedsMoreSignatures(
         `Transaction requires signatures from ${sigsNeeded}. See \`needsNonInvokerSigningBy\` for details.`
@@ -5037,7 +5156,6 @@ You can set \`restore\` to true in the method options in order to automatically 
     }
     const timeoutInSeconds = this.options.timeoutInSeconds ?? DEFAULT_TIMEOUT;
     this.built = transaction_builder/* TransactionBuilder */.Qc.cloneFrom(this.built, {
-      fee: this.built.fee,
       timebounds: void 0,
       sorobanData: this.simulationData.transactionData
     }).setTimeout(timeoutInSeconds).build();
@@ -5084,6 +5202,7 @@ You can set \`restore\` to true in the method options in order to automatically 
   signAndSend = async ({
     force = false,
     signTransaction = this.options.signTransaction,
+    ignoreContractDelegates = false,
     watcher
   } = {}) => {
     if (!this.signed) {
@@ -5092,32 +5211,38 @@ You can set \`restore\` to true in the method options in order to automatically 
         this.options.networkPassphrase
       );
       const wrappedSignTransaction = this.options.submit && signer ? (tx, opts) => signer(tx, { ...opts, submit: false }) : signTransaction;
-      await this.sign({ force, signTransaction: wrappedSignTransaction });
+      await this.sign({
+        force,
+        signTransaction: wrappedSignTransaction,
+        ignoreContractDelegates
+      });
     }
     return this.send(watcher);
   };
   /**
-   * Get a list of accounts, other than the invoker of the simulation, that
-   * need to sign auth entries in this transaction.
+   * Lists each address in the address-credential auth entries that still
+   * lacks a signature (or every such address, with `includeAlreadySigned`):
+   * the top-level address, plus the CAP-71 delegates under a `C…` account,
+   * signed or not. On p27 a `G…` account's delegates are never listed. Source
+   * account credentials are skipped, since the envelope signature covers them;
+   * address credentials are listed even when their address is the transaction
+   * source.
    *
-   * Soroban allows multiple people to sign a transaction. Someone needs to
-   * sign the final transaction envelope; this person/account is called the
-   * _invoker_, or _source_. Other accounts might need to sign individual auth
-   * entries in the transaction, if they're not also the invoker.
-   *
-   * This function returns a list of accounts that need to sign auth entries,
-   * assuming that the same invoker/source account will sign the final
-   * transaction envelope as signed the initial simulation.
-   *
-   * One at a time, for each public key in this array, you will need to
-   * serialize this transaction with `toJson`, send to the owner of that key,
-   * deserialize the transaction with `txFromJson`, and call
-   * {@link AssembledTransaction.signAuthEntries}. Then re-serialize and send to
-   * the next account in this list.
+   * An unsigned `C…` account stays listed even once its delegates have signed;
+   * filter it out if it authorizes only through delegates. `signAuthEntries`
+   * signs top-level addresses only; sign delegates with `authorizeEntry` and
+   * `forAddress`.
+   * This is a signature-presence heuristic, not an authorization check: it
+   * does not see custom account policy or requirements raised inside
+   * `__check_auth`. The contract auth guide covers the caveats.
    */
   needsNonInvokerSigningBy = ({
     includeAlreadySigned = false
-  } = {}) => {
+  } = {}) => this.unsignedAddresses({ includeAlreadySigned, includeDelegates: true });
+  unsignedAddresses({
+    includeAlreadySigned = false,
+    includeDelegates
+  }) {
     if (!this.built) {
       throw new Error("Transaction has not yet been simulated");
     }
@@ -5131,19 +5256,15 @@ You can set \`restore\` to true in the method options in order to automatically 
     const rawInvokeHostFunctionOp = this.built.operations[0];
     return [
       ...new Set(
-        (rawInvokeHostFunctionOp.auth ?? []).map((entry) => inspectAuthEntry(entry)).filter(
-          (info) => (
-            // skip source-account credentials (no address payload), which
-            // are covered by the envelope signature on the source account.
-            // Only the top-level credentials (signers[0]) matter here — this
-            // method reports (and signAuthEntries signs) the top-level
-            // address, so unsigned delegate nodes must not keep it listed.
-            info.address !== null && (includeAlreadySigned || !info.signers[0].signed)
-          )
-        ).map((info) => info.address)
+        (rawInvokeHostFunctionOp.auth ?? []).flatMap(
+          (entry) => pendingSigners(entry.credentials, {
+            includeSigned: includeAlreadySigned,
+            includeDelegates
+          })
+        )
       )
     ];
-  };
+  }
   /**
    * If {@link AssembledTransaction#needsNonInvokerSigningBy} returns a
    * non-empty list, you can serialize the transaction with `toJson`, send it to
@@ -5159,30 +5280,52 @@ You can set \`restore\` to true in the method options in order to automatically 
    *
    * Sending to all `needsNonInvokerSigningBy` owners in parallel is not
    * currently supported!
+   *
+   * Only top-level address credentials are selected; delegate nodes and
+   * requirements raised inside a custom account's `__check_auth` are not.
+   * `needsNonInvokerSigningBy` also lists `C…` delegates, which this method
+   * rejects, and keeps a `C…` account listed after its delegates sign, so a
+   * loop until that list is empty may never finish. Sign delegates with
+   * `authorizeEntry` and `forAddress` instead.
+   *
+   * With the default authorizer, the wallet's returned `signerAddress` names
+   * the key the signature is verified against, which may differ from `address`.
    */
   signAuthEntries = async ({
-    expiration = (async () => (await this.server.getLatestLedger()).sequence + 100)(),
+    expiration,
     signAuthEntry = this.options.signAuthEntry,
-    address = signerAddress(signAuthEntry) ?? this.options.publicKey,
+    address: addressArg,
     authorizeEntry: authorizeEntry$1 = authorizeEntry
   } = {}) => {
     if (!this.built)
       throw new Error("Transaction has not yet been assembled or simulated");
+    const derivedAddress = signerAddress(signAuthEntry);
+    const address = addressArg ?? derivedAddress ?? this.options.publicKey;
+    const noEntriesFor = () => {
+      const base = `No auth entries for public key "${address}"`;
+      if (addressArg != null || derivedAddress !== void 0) return base;
+      const unnamed = "`address` was not given and `signAuthEntry` does not name one";
+      const fix = "Pass `address` to say who is signing.";
+      return address === void 0 ? `No account to sign for: ${unnamed}. ${fix}` : `${base}; ${unnamed}, so it defaulted to the account that built this transaction. ${fix}`;
+    };
     const signAuth = toSignAuthEntry(
       signAuthEntry,
       this.options.networkPassphrase
     );
     if (authorizeEntry$1 === authorizeEntry) {
-      const needsNonInvokerSigningBy = this.needsNonInvokerSigningBy();
-      if (needsNonInvokerSigningBy.length === 0) {
+      const unsigned = this.unsignedAddresses({ includeDelegates: false });
+      if (address !== void 0 && !unsigned.includes(address) && this.needsNonInvokerSigningBy().includes(address)) {
+        throw new AssembledTransaction.Errors.NoSignatureNeeded(
+          `"${address}" is an unsigned delegate, and \`signAuthEntries\` signs top-level addresses only. Sign it with \`authorizeEntry\` and \`forAddress\`.`
+        );
+      }
+      if (unsigned.length === 0) {
         throw new AssembledTransaction.Errors.NoUnsignedNonInvokerAuthEntries(
           "No unsigned non-invoker auth entries; maybe you already signed?"
         );
       }
-      if (needsNonInvokerSigningBy.indexOf(address ?? "") === -1) {
-        throw new AssembledTransaction.Errors.NoSignatureNeeded(
-          `No auth entries for public key "${address}"`
-        );
+      if (unsigned.indexOf(address ?? "") === -1) {
+        throw new AssembledTransaction.Errors.NoSignatureNeeded(noEntriesFor());
       }
       if (!signAuth) {
         throw new AssembledTransaction.Errors.NoSigner(
@@ -5192,6 +5335,13 @@ You can set \`restore\` to true in the method options in order to automatically 
     }
     const rawInvokeHostFunctionOp = this.built.operations[0];
     const authEntries = rawInvokeHostFunctionOp.auth ?? [];
+    let signedAny = false;
+    let latestLedger;
+    const defaultExpiration = async (credentials, stored) => {
+      latestLedger ??= this.server.getLatestLedger().then((ledger) => ledger.sequence);
+      const latest = await latestLedger;
+      return credentials.type === "sorobanCredentialsAddressWithDelegates" && stored > latest && stored <= latest + 100 ? stored : latest + 100;
+    };
     for (const [i, entry] of authEntries.entries()) {
       const credentials = soroban_credentials/* SorobanCredentials */.j5.fromXdr(entry.credentials.toXdr());
       const addrAuth = getAddressCredentials(credentials);
@@ -5206,18 +5356,25 @@ You can set \`restore\` to true in the method options in order to automatically 
       authEntries[i] = await authorizeEntry$1(
         entry,
         async (preimage) => {
-          const { signedAuthEntry, error } = await sign(
-            preimage.toXdr("base64"),
-            {
-              address
-            }
-          );
+          const {
+            signedAuthEntry,
+            signerAddress: resultAddress,
+            error
+          } = await sign(preimage.toXdr("base64"), {
+            address
+          });
           this.handleWalletError(error);
-          return (0,base64/* base64ToUint8Array */.E)(signedAuthEntry);
+          const signature = (0,base64/* base64ToUint8Array */.E)(signedAuthEntry);
+          const signingKey = authorizeEntry$1 === authorizeEntry ? walletSigningKey(resultAddress) : void 0;
+          return signingKey === void 0 ? signature : { signature, publicKey: signingKey };
         },
-        await expiration,
+        await (expiration ?? defaultExpiration(credentials, addrAuth.signatureExpirationLedger)),
         this.options.networkPassphrase
       );
+      signedAny = true;
+    }
+    if (!signedAny) {
+      throw new AssembledTransaction.Errors.NoSignatureNeeded(noEntriesFor());
     }
   };
   /**
@@ -5241,10 +5398,13 @@ You can set \`restore\` to true in the method options in order to automatically 
    * 3. Send the signed transaction to the network.
    * 4. Await and return the response from the network.
    *
+   * The restore transaction uses the `fee` option (default: {@link BASE_FEE}) as
+   * its inclusion fee, and takes its resource fee from its own simulation.
+   * `restorePreamble.minResourceFee` is not used.
+   *
    * Preconditions:
    * - A `signTransaction` function must be provided during the Client initialization.
-   * - The provided `restorePreamble` should include a minimum resource fee and valid
-   *   transaction data.
+   * - The provided `restorePreamble` should include valid transaction data.
    *
    * @throws - Throws an error if no `signTransaction` function is provided during
    * Client initialization.
@@ -5261,8 +5421,7 @@ You can set \`restore\` to true in the method options in order to automatically 
     const restoreTx = await AssembledTransaction.buildFootprintRestoreTransaction(
       { ...this.options },
       restorePreamble.transactionData,
-      account,
-      restorePreamble.minResourceFee
+      account
     );
     const sentTransaction = await restoreTx.signAndSend();
     if (!sentTransaction.getTransactionResponse) {
@@ -5437,6 +5596,7 @@ class Client {
    * @param options - The ClientOptions object containing the necessary configuration.
    * @returns A Promise that resolves to a Client instance.
    * @throws If the contract spec cannot be obtained from the provided wasm binary.
+   * @throws If the wasm binary has more than one `contractspecv0` section.
    *
    * @example
    * ```ts

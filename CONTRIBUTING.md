@@ -41,6 +41,12 @@ docs: add README, CONTRIBUTING, SECURITY
       dropped, never auto-redistributed.
 - [ ] The Action fails loudly (non-zero exit, `core.setFailed`) on any registry
       validation error, RPC submission failure, or unconfirmed transaction.
+- [ ] `contracts/vault` keeps the `post_cycle_root` / `get_cycle_info` ABI and
+      the frozen Merkle leaf format — both are on-chain protocol surface. Any
+      deliberate change needs the golden fixture regenerated on **both** sides
+      in the same commit.
+- [ ] `cargo test --workspace` and `stellar contract build` stay green for
+      contract changes.
 
 ## Layout
 
@@ -53,6 +59,9 @@ src/manifest.ts              floor payout formula + dust remainder + manifest
 src/merkle.ts                leaf XDR hashing + sorted-pair tree
 src/relay.ts                 Soroban RPC: cycle query, build/sign/submit/confirm
 schemas/splitstream.schema.ts  zod schema (exported for reuse/tests)
+Cargo.toml                   Rust workspace root (contract build profile)
+contracts/vault/src/         Soroban vault: lib, storage, merkle, claims, errors
+contracts/vault/src/test.rs  Rust tests incl. the shared golden Merkle fixture
 ```
 
 ## Testing
@@ -60,9 +69,17 @@ schemas/splitstream.schema.ts  zod schema (exported for reuse/tests)
 ```bash
 npm run typecheck   # strict TS, no implicit any
 npm test            # vitest — unit tests always run
+
+cargo test --workspace   # contract unit tests (incl. cross-language Merkle golden)
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+stellar contract build --package splitstream-vault
 ```
 
-Unit suites: `registry`, `counts`, `manifest`, `merkle` (golden), `ingest`.
+Unit suites: `registry`, `counts`, `manifest`, `merkle` (golden), `ingest`, and
+the Rust `contracts/vault` suite. `test/fixtures/merkle.golden.json` is the
+single source of truth for both languages: `src/merkle.ts` and
+`contracts/vault/src/merkle.rs` are each asserted against it.
 
 ### Testnet integration tests (gated)
 

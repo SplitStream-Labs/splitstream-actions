@@ -40312,6 +40312,7 @@ class Account {
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   N: () => (/* binding */ assertNotMuxed),
 /* harmony export */   p: () => (/* binding */ Address)
 /* harmony export */ });
 /* harmony import */ var uint8array_extras__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5770);
@@ -40319,13 +40320,15 @@ class Account {
 /* harmony import */ var _xdr_index_js__WEBPACK_IMPORTED_MODULE_11__ = __nccwpck_require__(8940);
 /* harmony import */ var _xdr_generated_claimable_balance_id_type_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(1290);
 /* harmony import */ var _xdr_generated_muxed_ed25519_account_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(9867);
-/* harmony import */ var _xdr_generated_sc_val_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(9679);
+/* harmony import */ var _xdr_generated_sc_val_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(8497);
 /* harmony import */ var _xdr_generated_sc_address_js__WEBPACK_IMPORTED_MODULE_5__ = __nccwpck_require__(3309);
+/* harmony import */ var _xdr_generated_muxed_contract_js__WEBPACK_IMPORTED_MODULE_12__ = __nccwpck_require__(4036);
+/* harmony import */ var _xdr_generated_contract_id_js__WEBPACK_IMPORTED_MODULE_7__ = __nccwpck_require__(7662);
 /* harmony import */ var _xdr_generated_claimable_balance_id_js__WEBPACK_IMPORTED_MODULE_9__ = __nccwpck_require__(777);
 /* harmony import */ var _xdr_generated_hash_js__WEBPACK_IMPORTED_MODULE_10__ = __nccwpck_require__(4448);
-/* harmony import */ var _xdr_generated_contract_id_js__WEBPACK_IMPORTED_MODULE_7__ = __nccwpck_require__(7662);
 /* harmony import */ var _xdr_generated_pool_id_js__WEBPACK_IMPORTED_MODULE_8__ = __nccwpck_require__(6634);
 /* harmony import */ var _xdr_generated_public_key_js__WEBPACK_IMPORTED_MODULE_6__ = __nccwpck_require__(2959);
+
 
 
 
@@ -40355,6 +40358,9 @@ class Address {
     } else if (_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidMed25519PublicKey(address)) {
       this._type = "muxedAccount";
       this._key = _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.decodeMed25519PublicKey(address);
+    } else if (_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidMuxedContract(address)) {
+      this._type = "muxedContract";
+      this._key = _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.decodeMuxedContract(address);
     } else if (_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidClaimableBalance(address)) {
       this._type = "claimableBalance";
       this._key = _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.decodeClaimableBalance(address);
@@ -40414,6 +40420,15 @@ class Address {
     return new Address(_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.encodeMed25519PublicKey(buffer));
   }
   /**
+   * Creates a new muxed contract Address object from raw bytes: the 32-byte
+   * contract ID followed by the 8-byte big-endian mux ID.
+   *
+   * @param buffer - The bytes of an address to parse.
+   */
+  static muxedContract(buffer) {
+    return new Address(_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.encodeMuxedContract(buffer));
+  }
+  /**
    * Convert this from an xdr.ScVal type.
    *
    * @param scVal - The xdr.ScVal type to parse
@@ -40456,6 +40471,12 @@ class Address {
       }
       case "scAddressTypeLiquidityPool":
         return Address.liquidityPool(scAddress.value.toBytes());
+      case "scAddressTypeMuxedContract": {
+        const muxed = scAddress.value;
+        return Address.muxedContract(
+          (0,_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .packMuxedContract */ .lo)(muxed.contractId.value, muxed.id)
+        );
+      }
       default:
         throw new Error("Unsupported address type");
     }
@@ -40475,6 +40496,8 @@ class Address {
         return _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.encodeLiquidityPool(this._key);
       case "muxedAccount":
         return _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.encodeMed25519PublicKey(this._key);
+      case "muxedContract":
+        return _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.encodeMuxedContract(this._key);
       default:
         throw new Error("Unsupported address type");
     }
@@ -40509,6 +40532,12 @@ class Address {
             id: _xdr_index_js__WEBPACK_IMPORTED_MODULE_11__/* .Uint64 */ .Rf3.fromXdr(this._key.subarray(32, 40), "raw")
           })
         );
+      case "muxedContract": {
+        const { contractId, id } = (0,_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .unpackMuxedContract */ .Qx)(this._key);
+        return _xdr_generated_sc_address_js__WEBPACK_IMPORTED_MODULE_5__/* .ScAddress */ .lu.scAddressTypeMuxedContract(
+          new _xdr_generated_muxed_contract_js__WEBPACK_IMPORTED_MODULE_12__/* .MuxedContract */ .k({ id, contractId: new _xdr_generated_contract_id_js__WEBPACK_IMPORTED_MODULE_7__/* .ContractId */ .K(contractId) })
+        );
+      }
       default:
         throw new Error("Unsupported address type");
     }
@@ -40524,6 +40553,12 @@ class Address {
    */
   get type() {
     return this._type;
+  }
+}
+function assertNotMuxed(address, reason) {
+  const muxed = typeof address === "string" ? _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidMed25519PublicKey(address) || _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidMuxedContract(address) : address.type === "muxedAccount" || address.type === "muxedContract";
+  if (muxed) {
+    throw new TypeError(`muxed address ${address.toString()} ${reason}`);
   }
 }
 
@@ -40545,7 +40580,7 @@ class Address {
 /* harmony import */ var _xdr_generated_ledger_key_contract_data_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(4783);
 /* harmony import */ var _xdr_generated_contract_data_durability_js__WEBPACK_IMPORTED_MODULE_6__ = __nccwpck_require__(3079);
 /* harmony import */ var _xdr_generated_ledger_key_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(8678);
-/* harmony import */ var _xdr_generated_sc_val_js__WEBPACK_IMPORTED_MODULE_5__ = __nccwpck_require__(9679);
+/* harmony import */ var _xdr_generated_sc_val_js__WEBPACK_IMPORTED_MODULE_5__ = __nccwpck_require__(8497);
 
 
 
@@ -40565,6 +40600,11 @@ class Contract {
     try {
       this._id = _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.decodeContract(contractId);
     } catch {
+      if (_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidMuxedContract(contractId)) {
+        throw new Error(
+          `Invalid contract ID: ${contractId} is a muxed contract address; use its base address (C...)`
+        );
+      }
       throw new Error(`Invalid contract ID: ${contractId}`);
     }
   }
@@ -40630,10 +40670,10 @@ class Contract {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   P: () => (/* binding */ FeeBumpTransaction)
 /* harmony export */ });
-/* harmony import */ var _util_base64_js__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5601);
 /* harmony import */ var _hashing_js__WEBPACK_IMPORTED_MODULE_8__ = __nccwpck_require__(7935);
 /* harmony import */ var _transaction_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(7271);
 /* harmony import */ var _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7164);
+/* harmony import */ var _xdr_util_js__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(9838);
 /* harmony import */ var _util_decode_encode_muxed_account_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(4473);
 /* harmony import */ var _xdr_generated_fee_bump_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_9__ = __nccwpck_require__(7815);
 /* harmony import */ var _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(9675);
@@ -40654,7 +40694,7 @@ class Contract {
 
 
 
-class FeeBumpTransaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .TransactionBase */ .O {
+class FeeBumpTransaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .TransactionBase */ .OB {
   _feeSource;
   _innerTransaction;
   /**
@@ -40663,17 +40703,12 @@ class FeeBumpTransaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0
    *     (e.g. "Public Global Stellar Network ; September 2015").
    */
   constructor(envelope, networkPassphrase) {
-    if (typeof envelope === "string") {
-      const bytes = (0,_util_base64_js__WEBPACK_IMPORTED_MODULE_1__/* .base64ToUint8Array */ .E)(envelope);
-      envelope = _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_2__/* .TransactionEnvelope */ .BB.fromXdr(bytes);
-    }
-    const envelopeType = envelope.type;
-    if (envelopeType !== "envelopeTypeTxFeeBump") {
-      throw new Error(
-        `Invalid TransactionEnvelope: expected an envelopeTypeTxFeeBump but received an ${envelopeType}.`
-      );
-    }
-    const txEnvelope = envelope.value;
+    const own = (0,_transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .ownEnvelope */ .px)(
+      envelope,
+      (value) => (0,_xdr_util_js__WEBPACK_IMPORTED_MODULE_1__/* .isUnionVariant */ .$)(value, "envelopeTypeTxFeeBump"),
+      "envelopeTypeTxFeeBump"
+    );
+    const txEnvelope = own.value;
     const tx = txEnvelope.tx;
     const fee = tx.fee.toString();
     const signatures = (txEnvelope.signatures || []).slice();
@@ -40683,7 +40718,7 @@ class FeeBumpTransaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0
     );
     this._feeSource = (0,_util_decode_encode_muxed_account_js__WEBPACK_IMPORTED_MODULE_3__/* .encodeMuxedAccountToAddress */ .aQ)(this.tx.feeSource);
     this._innerTransaction = new _transaction_js__WEBPACK_IMPORTED_MODULE_4__/* .Transaction */ .Z(
-      innerTxEnvelope,
+      (0,_transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .markSdkOwned */ .H9)(innerTxEnvelope),
       networkPassphrase
     );
   }
@@ -41737,19 +41772,22 @@ function signing_verify(data, signature, rawPublicKey) {
 var strkey = __nccwpck_require__(3697);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/hashing.js
 var hashing = __nccwpck_require__(7935);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/util/decode_encode_muxed_account.js
+var decode_encode_muxed_account = __nccwpck_require__(4473);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/index.js
 var xdr = __nccwpck_require__(8940);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/public-key.js + 1 modules
 var public_key = __nccwpck_require__(2959);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/muxed-account.js + 1 modules
-var muxed_account = __nccwpck_require__(146);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/muxed-account-med25519.js
-var muxed_account_med25519 = __nccwpck_require__(4144);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/decorated-signature.js + 1 modules
 var decorated_signature = __nccwpck_require__(4938);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/signature.js
 var signature = __nccwpck_require__(3596);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/muxed-account.js + 1 modules
+var muxed_account = __nccwpck_require__(146);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/muxed-account-med25519.js
+var muxed_account_med25519 = __nccwpck_require__(4144);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/keypair.js
+
 
 
 
@@ -41874,8 +41912,8 @@ class Keypair {
    * You will get a different type of muxed account depending on whether or not
    * you pass an ID.
    *
-   * @param id - stringified integer indicating the underlying muxed
-   *     ID of the new account object
+   * @param id - the underlying muxed ID of the new account object, as a
+   *     uint64 in decimal digits. Leading zeros are removed. At most 22 digits.
    */
   xdrMuxedAccount(id) {
     if (typeof id !== "undefined") {
@@ -41884,7 +41922,7 @@ class Keypair {
       }
       return muxed_account/* MuxedAccount */.HW.keyTypeMuxedEd25519(
         new muxed_account_med25519/* MuxedAccountMed25519 */.b({
-          id: xdr/* Uint64 */.Rf3.fromString(id),
+          id: xdr/* Uint64 */.Rf3.fromString((0,decode_encode_muxed_account/* canonicalUint64Id */.m9)(id)),
           ed25519: this._publicKey
         })
       );
@@ -42239,8 +42277,9 @@ class Memo {
   /**
    * Creates and returns a `MemoText` memo.
    *
-   * @param text - memo text. A JS string is UTF-8 encoded on the wire;
-   *   pass a `Uint8Array` for byte-exact content. A plain `number[]` is not
+   * @param text - memo text. A JS string is UTF-8 encoded on the wire, and
+   *   a lone surrogate becomes U+FFFD with no error; pass a `Uint8Array`
+   *   for byte-exact content. A plain `number[]` is not
    *   accepted (16.2.0 and earlier took one); wrap it: `new Uint8Array(arr)`.
    */
   static text(text) {
@@ -42403,7 +42442,7 @@ function scValToBigInt(scv) {
 /* harmony import */ var _xdr_generated_uint128_parts_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(7716);
 /* harmony import */ var _xdr_generated_int256_parts_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(57);
 /* harmony import */ var _xdr_generated_uint256_parts_js__WEBPACK_IMPORTED_MODULE_5__ = __nccwpck_require__(6260);
-/* harmony import */ var _xdr_generated_sc_val_js__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(9679);
+/* harmony import */ var _xdr_generated_sc_val_js__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(8497);
 
 
 
@@ -42731,6 +42770,8 @@ var keypair = __nccwpck_require__(8477);
 var strkey = __nccwpck_require__(3697);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/hashing.js
 var hashing = __nccwpck_require__(7935);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/asset-type.js
+var asset_type = __nccwpck_require__(2143);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/asset.js
 var asset = __nccwpck_require__(4566);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/change-trust-asset.js
@@ -42747,8 +42788,6 @@ var contract_id_preimage = __nccwpck_require__(9206);
 var alpha_num4 = __nccwpck_require__(5203);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/alpha-num12.js
 var alpha_num12 = __nccwpck_require__(4712);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/asset-type.js
-var asset_type = __nccwpck_require__(2143);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/asset.js
 
 
@@ -42781,6 +42820,11 @@ class Asset {
   /** The account ID of the issuer. Undefined for the native asset. */
   issuer;
   /**
+   * The XDR union arm this asset encodes to. A private field so the object's
+   * JSON/spread shape keeps only the code and issuer.
+   */
+  #rawAssetType;
+  /**
    * @param code - The asset code.
    * @param issuer - The account ID of the issuer.
    */
@@ -42796,12 +42840,19 @@ class Asset {
     if (issuer && !strkey/* StrKey */.L8.isValidEd25519PublicKey(issuer)) {
       throw new Error("Issuer is invalid");
     }
-    if (String(code).toLowerCase() === "xlm") {
+    if (!issuer && String(code).toLowerCase() === "xlm") {
       this.code = "XLM";
     } else {
       this.code = code;
     }
     this.issuer = issuer;
+    this.#rawAssetType = Asset.#deriveRawAssetType(this.code, issuer);
+  }
+  static #deriveRawAssetType(code, issuer) {
+    if (!issuer) {
+      return asset_type/* AssetType */.P.assetTypeNative;
+    }
+    return code.length <= 4 ? asset_type/* AssetType */.P.assetTypeCreditAlphanum4 : asset_type/* AssetType */.P.assetTypeCreditAlphanum12;
   }
   /**
    * Returns an asset object for the native asset.
@@ -42828,14 +42879,17 @@ class Asset {
           "\0"
         );
         return new this(code, issuer);
-      case "assetTypeCreditAlphanum12":
+      case "assetTypeCreditAlphanum12": {
         anum = assetXdr.alphaNum12;
         issuer = strkey/* StrKey */.L8.encodeEd25519PublicKey(anum.issuer.ed25519.toBytes());
         code = trimEnd(
           (0,uint8array_extras/* uint8ArrayToString */.SW)(anum.assetCode.toBytes()),
           "\0"
         );
-        return new this(code, issuer);
+        const asset = new this(code, issuer);
+        asset.#rawAssetType = asset_type/* AssetType */.P.assetTypeCreditAlphanum12;
+        return asset;
+      }
       default:
         throw new Error("Invalid asset type received: " + assetXdr.type);
     }
@@ -42913,7 +42967,7 @@ class Asset {
     if (!this.issuer) {
       throw new Error("Issuer cannot be null for non-native asset");
     }
-    if (this.code.length <= 4) {
+    if (this.getRawAssetType().value === asset_type/* AssetType */.P.assetTypeCreditAlphanum4.value) {
       const assetType2 = new alpha_num4/* AlphaNum4 */.B({
         assetCode: (0,uint8array_extras/* stringToUint8Array */.Al)(this.code.padEnd(4, "\0")),
         issuer: keypair/* Keypair */.A.fromPublicKey(this.issuer).xdrAccountId()
@@ -42968,13 +43022,11 @@ class Asset {
    * Returns the raw XDR representation of the asset type
    */
   getRawAssetType() {
-    if (this.isNative()) {
-      return asset_type/* AssetType */.P.assetTypeNative;
+    const { code, issuer } = this;
+    if (#rawAssetType in this) {
+      return this.#rawAssetType;
     }
-    if (this.code.length <= 4) {
-      return asset_type/* AssetType */.P.assetTypeCreditAlphanum4;
-    }
-    return asset_type/* AssetType */.P.assetTypeCreditAlphanum12;
+    return Asset.#deriveRawAssetType(code, issuer);
   }
   /**
    * Returns true if this asset object is the native asset.
@@ -42988,7 +43040,7 @@ class Asset {
    * @param asset - Asset to compare
    */
   equals(asset) {
-    return this.code === asset.getCode() && this.issuer === asset.getIssuer();
+    return this.code === asset.getCode() && this.issuer === asset.getIssuer() && this.getRawAssetType().value === asset.getRawAssetType().value;
   }
   /**
    * Returns a string representation of this asset.
@@ -43035,7 +43087,10 @@ class Asset {
     if (issuerA === void 0 || issuerB === void 0) {
       throw new Error("Issuer is undefined for non-native asset");
     }
-    return asciiCompare(issuerA, issuerB);
+    return (0,uint8array_extras/* compareUint8Arrays */._T)(
+      strkey/* StrKey */.L8.decodeEd25519PublicKey(issuerA),
+      strkey/* StrKey */.L8.decodeEd25519PublicKey(issuerB)
+    );
   }
 }
 
@@ -43284,9 +43339,9 @@ class Claimant {
   /**
    * Returns a `BeforeAbsoluteTime` claim predicate
    *
-   * This predicate will be fulfilled if the closing time of the ledger that
-   * includes the CreateClaimableBalance operation is less than this (absolute)
-   * Unix timestamp (expressed in seconds).
+   * This predicate will be fulfilled if the closing time of the ledger in
+   * which the balance is claimed is less than this (absolute) Unix timestamp
+   * (expressed in seconds).
    *
    * @param absBefore - Unix epoch (in seconds) as a string
    */
@@ -43298,9 +43353,11 @@ class Claimant {
   /**
    * Returns a `BeforeRelativeTime` claim predicate
    *
-   * This predicate will be fulfilled if the closing time of the ledger that
-   * includes the CreateClaimableBalance operation plus this relative time delta
-   * (in seconds) is less than the current time.
+   * When the balance is created, this is converted to a `BeforeAbsoluteTime`
+   * predicate by adding this relative time delta (in seconds) to the closing
+   * time of the ledger that includes the CreateClaimableBalance operation. The
+   * predicate is then fulfilled while the closing time of the ledger in which
+   * the balance is claimed is less than that sum.
    *
    * @param seconds - seconds since closeTime of the ledger in which the ClaimableBalanceEntry was created (as string)
    */
@@ -43585,6 +43642,41 @@ function toXdrAmount(value) {
   const amount = new bignumber/* default */.A(value).times(ONE);
   return xdr/* Int64 */.CGN.fromString(amount.toString());
 }
+function toXdrOfferId(offerId) {
+  if (offerId === void 0) {
+    return xdr/* Int64 */.CGN.fromString("0");
+  }
+  let value;
+  if (typeof offerId === "number") {
+    if (!Number.isSafeInteger(offerId) || offerId < 0) {
+      throw new Error(
+        "offerId must be a non-negative safe integer; pass a larger ID as a bigint or a decimal string"
+      );
+    }
+    value = BigInt(offerId);
+  } else if (typeof offerId === "bigint") {
+    if (offerId < 0n) {
+      throw new Error("offerId must not be negative");
+    }
+    value = offerId;
+  } else if (typeof offerId === "string") {
+    if (offerId.length > 22) {
+      throw new Error("offerId must have at most 22 digits");
+    }
+    if (!/^\d+$/.test(offerId)) {
+      throw new Error("offerId must be a string of decimal digits");
+    }
+    value = BigInt(offerId);
+  } else {
+    throw new Error(
+      "offerId must be a number, a bigint, or a string of decimal digits"
+    );
+  }
+  if (value > xdr/* Int64 */.CGN.MAX_VALUE) {
+    throw new Error(`offerId must not exceed ${xdr/* Int64 */.CGN.MAX_VALUE}`);
+  }
+  return xdr/* Int64 */.CGN.fromString(value.toString());
+}
 function fromXdrAmount(value) {
   return new bignumber/* default */.A(value.toString()).div(ONE).toFixed(7);
 }
@@ -43607,7 +43699,7 @@ function toXdrPrice(price) {
       d: parseInt(String(approx[1]), 10)
     });
   }
-  if (xdrObject.n < 0 || xdrObject.d <= 0) {
+  if (xdrObject.n <= 0 || xdrObject.d <= 0) {
     throw new Error("price must be positive");
   }
   return xdrObject;
@@ -43665,8 +43757,7 @@ function manageSellOffer(opts) {
     throw new TypeError("price argument is required");
   }
   const price = toXdrPrice(opts.price);
-  const offerIdStr = opts.offerId !== void 0 ? opts.offerId.toString() : "0";
-  const offerId = xdr/* Int64 */.CGN.fromString(offerIdStr);
+  const offerId = toXdrOfferId(opts.offerId);
   const manageSellOfferOp = new manage_sell_offer_op/* ManageSellOfferOp */.h({
     selling,
     buying,
@@ -44151,8 +44242,7 @@ function manageBuyOffer(opts) {
     throw new TypeError("price argument is required");
   }
   const price = toXdrPrice(opts.price);
-  const offerIdStr = opts.offerId !== void 0 ? opts.offerId.toString() : "0";
-  const offerId = xdr/* Int64 */.CGN.fromString(offerIdStr);
+  const offerId = toXdrOfferId(opts.offerId);
   const manageBuyOfferOp = new manage_buy_offer_op/* ManageBuyOfferOp */.n({
     selling,
     buying,
@@ -44600,13 +44690,13 @@ function revokeOfferSponsorship(opts = {}) {
   if (!strkey/* StrKey */.L8.isValidEd25519PublicKey(opts.seller)) {
     throw new Error("seller is invalid");
   }
-  if (typeof opts.offerId !== "string") {
+  if (opts.offerId === void 0) {
     throw new Error("offerId is invalid");
   }
   const ledgerKey = ledger_key/* LedgerKey */.DU.offer(
     new ledger_key_offer/* LedgerKeyOffer */.d({
       sellerId: keypair/* Keypair */.A.fromPublicKey(opts.seller).xdrAccountId(),
-      offerId: xdr/* Int64 */.CGN.fromString(opts.offerId)
+      offerId: toXdrOfferId(opts.offerId)
     })
   );
   const op = revoke_sponsorship_op/* RevokeSponsorshipOp */.MY.revokeSponsorshipLedgerEntry(ledgerKey);
@@ -45657,6 +45747,8 @@ __nccwpck_require__.d(__webpack_exports__, {
 
 // UNUSED EXPORTS: scvSortedMap
 
+// EXTERNAL MODULE: ./node_modules/uint8array-extras/index.js
+var uint8array_extras = __nccwpck_require__(5770);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/index.js
 var xdr = __nccwpck_require__(8940);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/keypair.js + 2 modules
@@ -45725,9 +45817,13 @@ function nearestBigIntSize(bigI) {
 
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-bytes.js
 var sc_bytes = __nccwpck_require__(5756);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 5 modules
-var sc_val = __nccwpck_require__(9679);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 4 modules
+var sc_val = __nccwpck_require__(8497);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val-type.js
+var sc_val_type = __nccwpck_require__(1357);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/scval.js
+
+
 
 
 
@@ -45833,8 +45929,8 @@ function nativeToScVal(val, opts = {}) {
         );
       }
       const mapTypeSpec = opts?.type ?? {};
-      return sc_val/* ScVal */.wq.scvMap(
-        Object.entries(val).sort(([key1], [key2]) => key1 < key2 ? -1 : key1 > key2 ? 1 : 0).map(([k, v]) => {
+      return scvSortedMap(
+        Object.entries(val).map(([k, v]) => {
           const [keyType, valType] = Object.hasOwn(mapTypeSpec, k) ? mapTypeSpec[k] ?? [null, null] : [null, null];
           const keyOpts = keyType ? { type: keyType } : {};
           const valOpts = valType ? { type: valType } : {};
@@ -45898,8 +45994,6 @@ function nativeToScVal(val, opts = {}) {
       return sc_val/* ScVal */.wq.scvBool(val);
     case "undefined":
       return sc_val/* ScVal */.wq.scvVoid();
-    case "function":
-      return nativeToScVal(val());
     default:
       throw new TypeError(
         `failed to convert typeof ${typeof val} (${JSON.stringify(val)})`
@@ -45926,13 +46020,23 @@ function scValToNative(scv) {
       return (scv.value ?? []).map(scValToNative);
     case "scvAddress":
       return address/* Address */.p.fromScVal(scv).toString();
-    case "scvMap":
-      return Object.fromEntries(
-        (scv.value ?? []).map((entry) => [
-          scValToNative(entry.key),
-          scValToNative(entry.val)
-        ])
-      );
+    case "scvMap": {
+      const pairs = (scv.value ?? []).map((entry) => [
+        scValToNative(entry.key),
+        scValToNative(entry.val)
+      ]);
+      const seen = /* @__PURE__ */ new Set();
+      for (const [key] of pairs) {
+        const prop = String(key);
+        if (seen.has(prop)) {
+          throw new TypeError(
+            `scvMap has more than one key that converts to "${prop}"; read the raw map entries instead`
+          );
+        }
+        seen.add(prop);
+      }
+      return Object.fromEntries(pairs);
+    }
     // these return the primitive type directly
     case "scvBool":
     case "scvU32":
@@ -45981,22 +46085,70 @@ function scValToNative(scv) {
   }
 }
 function scvSortedMap(items) {
-  const sorted = Array.from(items).sort((a, b) => {
-    const nativeA = scValToNative(a.key);
-    const nativeB = scValToNative(b.key);
-    switch (typeof nativeA) {
-      case "number":
-      case "bigint":
-        if (nativeA === nativeB) return 0;
-        return nativeA < nativeB ? -1 : 1;
-      default: {
-        const strA = nativeA.toString();
-        const strB = nativeB.toString();
-        return strA < strB ? -1 : strA > strB ? 1 : 0;
-      }
-    }
-  });
+  const sorted = Array.from(items).sort((a, b) => compareScVal(a.key, b.key));
   return sc_val/* ScVal */.wq.scvMap(sorted);
+}
+function compareScVal(a, b) {
+  if (a.type !== b.type) {
+    return sc_val_type/* ScValType */.W[a.type].value - sc_val_type/* ScValType */.W[b.type].value;
+  }
+  switch (a.type) {
+    case "scvBool":
+      return Number(a.b) - Number(b.b);
+    case "scvVoid":
+    case "scvLedgerKeyContractInstance":
+      return 0;
+    case "scvU32":
+    case "scvI32":
+    case "scvU64":
+    case "scvI64":
+    case "scvTimepoint":
+    case "scvDuration":
+    case "scvU128":
+    case "scvI128":
+    case "scvU256":
+    case "scvI256":
+      return compareBigInts((0,numbers/* scValToBigInt */.O)(a), (0,numbers/* scValToBigInt */.O)(b));
+    case "scvBytes":
+      return (0,uint8array_extras/* compareUint8Arrays */._T)(a.bytes.value, b.bytes.value);
+    case "scvString":
+      return (0,uint8array_extras/* compareUint8Arrays */._T)(a.str.bytes, b.str.bytes);
+    case "scvSymbol":
+      return (0,uint8array_extras/* compareUint8Arrays */._T)(a.sym.bytes, b.sym.bytes);
+    case "scvExecutableTag":
+      return (0,uint8array_extras/* compareUint8Arrays */._T)(
+        a.executableTag.bytes,
+        b.executableTag.bytes
+      );
+    case "scvVec":
+      return compareOptionalLists(a.vec, b.vec, compareScVal);
+    case "scvMap":
+      return compareOptionalLists(
+        a.map,
+        b.map,
+        (x, y) => compareScVal(x.key, y.key) || compareScVal(x.val, y.val)
+      );
+    case "scvLedgerKeyNonce":
+      return compareBigInts(a.nonceKey.nonce, b.nonceKey.nonce);
+    // Errors and addresses hold only fixed-size unsigned fields, so their XDR
+    // bytes sort the same as their values. Contract instances are never
+    // sensible map keys, so best-effort byte order is enough there.
+    default:
+      return (0,uint8array_extras/* compareUint8Arrays */._T)(a.toXdr(), b.toXdr());
+  }
+}
+function compareBigInts(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+function compareOptionalLists(a, b, compare) {
+  if (a === null || b === null) {
+    return Number(a !== null) - Number(b !== null);
+  }
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    const result = compare(a[i], b[i]);
+    if (result !== 0) return result;
+  }
+  return a.length - b.length;
 }
 
 
@@ -46220,7 +46372,9 @@ class SorobanDataBuilder {
 __nccwpck_require__.d(__webpack_exports__, {
   L8: () => (/* binding */ StrKey),
   zV: () => (/* binding */ decodeCheck),
-  zJ: () => (/* binding */ encodeCheck)
+  zJ: () => (/* binding */ encodeCheck),
+  lo: () => (/* binding */ packMuxedContract),
+  Qx: () => (/* binding */ unpackMuxedContract)
 });
 
 // EXTERNAL MODULE: ./node_modules/uint8array-extras/index.js
@@ -46886,7 +47040,10 @@ function verifyChecksum(expected, actual) {
 
 //# sourceMappingURL=checksum.js.map
 
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/bigint-parts.js
+var bigint_parts = __nccwpck_require__(6163);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/strkey.js
+
 
 
 
@@ -46908,8 +47065,10 @@ const versionBytes = {
   // C
   liquidityPool: 11 << 3,
   // L
-  claimableBalance: 1 << 3
+  claimableBalance: 1 << 3,
   // B
+  muxedContract: 22 << 3
+  // W
 };
 const strkeyTypes = {
   G: "ed25519PublicKey",
@@ -46920,7 +47079,8 @@ const strkeyTypes = {
   P: "signedPayload",
   C: "contract",
   L: "liquidityPool",
-  B: "claimableBalance"
+  B: "claimableBalance",
+  W: "muxedContract"
 };
 function hasVersionByteName(versionByteName) {
   return Object.prototype.hasOwnProperty.call(versionBytes, versionByteName);
@@ -46937,6 +47097,7 @@ function encodedLengthRange(name) {
     case "claimableBalance":
       return [58, 58];
     case "med25519PublicKey":
+    case "muxedContract":
       return [69, 69];
     case "signedPayload":
       return [56, 165];
@@ -47173,6 +47334,31 @@ class StrKey {
     return isValid("claimableBalance", address);
   }
   /**
+   * Encodes raw data to strkey muxed contract (W...): the 32-byte contract ID
+   * followed by the 8-byte big-endian mux ID.
+   *
+   * @param data - data to encode
+   */
+  static encodeMuxedContract(data) {
+    return encodeCheck("muxedContract", data);
+  }
+  /**
+   * Decodes strkey muxed contract (W...) to raw data.
+   *
+   * @param address - address to decode
+   */
+  static decodeMuxedContract(address) {
+    return decodeCheck("muxedContract", address);
+  }
+  /**
+   * Checks validity of alleged muxed contract (W...) strkey address.
+   *
+   * @param address - address to check
+   */
+  static isValidMuxedContract(address) {
+    return isValid("muxedContract", address);
+  }
+  /**
    * Encodes raw data to strkey liquidity pool (L...).
    *
    * @param data - data to encode
@@ -47242,6 +47428,7 @@ function isValid(versionByteName, encoded) {
       return decoded.length === 32 + 1;
     // +1 byte for discriminant
     case "med25519PublicKey":
+    case "muxedContract":
       return decoded.length === 40;
     // +8 bytes for the ID
     case "signedPayload":
@@ -47571,6 +47758,21 @@ function calculateChecksum(payload) {
   checksum[1] = crc16 >> 8 & 255;
   return checksum;
 }
+function packMuxedContract(contractId, id) {
+  (0,bigint_parts/* assertBigIntFits */.Mp)(id, false, 64, "MuxedContract.id");
+  const raw = new Uint8Array(40);
+  raw.set(contractId, 0);
+  new DataView(raw.buffer).setBigUint64(32, id);
+  return raw;
+}
+function unpackMuxedContract(raw) {
+  return {
+    contractId: raw.subarray(0, 32),
+    id: new DataView(raw.buffer, raw.byteOffset, raw.byteLength).getBigUint64(
+      32
+    )
+  };
+}
 
 
 //# sourceMappingURL=strkey.js.map
@@ -47584,23 +47786,23 @@ function calculateChecksum(payload) {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   Z: () => (/* binding */ Transaction)
 /* harmony export */ });
-/* harmony import */ var uint8array_extras__WEBPACK_IMPORTED_MODULE_8__ = __nccwpck_require__(5770);
-/* harmony import */ var _util_base64_js__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5601);
+/* harmony import */ var uint8array_extras__WEBPACK_IMPORTED_MODULE_7__ = __nccwpck_require__(5770);
 /* harmony import */ var _xdr_index_js__WEBPACK_IMPORTED_MODULE_19__ = __nccwpck_require__(8940);
-/* harmony import */ var _hashing_js__WEBPACK_IMPORTED_MODULE_12__ = __nccwpck_require__(7935);
-/* harmony import */ var _strkey_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(3697);
-/* harmony import */ var _operation_js__WEBPACK_IMPORTED_MODULE_5__ = __nccwpck_require__(1843);
-/* harmony import */ var _memo_js__WEBPACK_IMPORTED_MODULE_6__ = __nccwpck_require__(5434);
+/* harmony import */ var _hashing_js__WEBPACK_IMPORTED_MODULE_11__ = __nccwpck_require__(7935);
+/* harmony import */ var _strkey_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(3697);
+/* harmony import */ var _operation_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(1843);
+/* harmony import */ var _memo_js__WEBPACK_IMPORTED_MODULE_5__ = __nccwpck_require__(5434);
 /* harmony import */ var _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7164);
-/* harmony import */ var _util_decode_encode_muxed_account_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(4473);
-/* harmony import */ var _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(9675);
-/* harmony import */ var _xdr_generated_transaction_signature_payload_tagged_transaction_js__WEBPACK_IMPORTED_MODULE_9__ = __nccwpck_require__(1478);
-/* harmony import */ var _xdr_generated_transaction_signature_payload_js__WEBPACK_IMPORTED_MODULE_10__ = __nccwpck_require__(313);
+/* harmony import */ var _xdr_util_js__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(9838);
+/* harmony import */ var _util_decode_encode_muxed_account_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(4473);
+/* harmony import */ var _xdr_generated_transaction_signature_payload_tagged_transaction_js__WEBPACK_IMPORTED_MODULE_8__ = __nccwpck_require__(1478);
+/* harmony import */ var _xdr_generated_transaction_signature_payload_js__WEBPACK_IMPORTED_MODULE_9__ = __nccwpck_require__(313);
 /* harmony import */ var _xdr_generated_transaction_v1_envelope_js__WEBPACK_IMPORTED_MODULE_15__ = __nccwpck_require__(2431);
 /* harmony import */ var _xdr_generated_transaction_v0_envelope_js__WEBPACK_IMPORTED_MODULE_13__ = __nccwpck_require__(1618);
 /* harmony import */ var _xdr_generated_hash_id_preimage_operation_id_js__WEBPACK_IMPORTED_MODULE_17__ = __nccwpck_require__(5717);
-/* harmony import */ var _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_7__ = __nccwpck_require__(9598);
-/* harmony import */ var _xdr_generated_hash_js__WEBPACK_IMPORTED_MODULE_11__ = __nccwpck_require__(4448);
+/* harmony import */ var _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_6__ = __nccwpck_require__(9598);
+/* harmony import */ var _xdr_generated_hash_js__WEBPACK_IMPORTED_MODULE_10__ = __nccwpck_require__(4448);
+/* harmony import */ var _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_12__ = __nccwpck_require__(9675);
 /* harmony import */ var _xdr_generated_transaction_v0_js__WEBPACK_IMPORTED_MODULE_14__ = __nccwpck_require__(4098);
 /* harmony import */ var _xdr_generated_hash_id_preimage_js__WEBPACK_IMPORTED_MODULE_16__ = __nccwpck_require__(9976);
 /* harmony import */ var _xdr_generated_public_key_js__WEBPACK_IMPORTED_MODULE_18__ = __nccwpck_require__(2959);
@@ -47627,7 +47829,7 @@ function calculateChecksum(payload) {
 
 
 
-class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .TransactionBase */ .O {
+class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .TransactionBase */ .OB {
   _envelopeType;
   _source = "";
   _memo;
@@ -47645,17 +47847,13 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
    *     (e.g. "Public Global Stellar Network ; September 2015")
    */
   constructor(envelope, networkPassphrase) {
-    if (typeof envelope === "string") {
-      const bytes = (0,_util_base64_js__WEBPACK_IMPORTED_MODULE_1__/* .base64ToUint8Array */ .E)(envelope);
-      envelope = _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_2__/* .TransactionEnvelope */ .BB.fromXdr(bytes);
-    }
-    const envelopeType = envelope.type;
-    if (envelopeType !== "envelopeTypeTxV0" && envelopeType !== "envelopeTypeTx") {
-      throw new Error(
-        `Invalid TransactionEnvelope: expected an envelopeTypeTxV0 or envelopeTypeTx but received an ${envelopeType}.`
-      );
-    }
-    const txEnvelope = envelope.value;
+    const own = (0,_transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .ownEnvelope */ .px)(
+      envelope,
+      (value) => (0,_xdr_util_js__WEBPACK_IMPORTED_MODULE_1__/* .isUnionVariant */ .$)(value, "envelopeTypeTxV0") || (0,_xdr_util_js__WEBPACK_IMPORTED_MODULE_1__/* .isUnionVariant */ .$)(value, "envelopeTypeTx"),
+      "envelopeTypeTxV0 or envelopeTypeTx"
+    );
+    const envelopeType = own.type;
+    const txEnvelope = own.value;
     const tx = txEnvelope.tx;
     const fee = tx.fee.toString();
     const signatures = (txEnvelope.signatures || []).slice();
@@ -47665,12 +47863,12 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
     this._sequence = tx.seqNum.toString();
     switch (this._envelopeType) {
       case "envelopeTypeTxV0":
-        this._source = _strkey_js__WEBPACK_IMPORTED_MODULE_3__/* .StrKey */ .L8.encodeEd25519PublicKey(
+        this._source = _strkey_js__WEBPACK_IMPORTED_MODULE_2__/* .StrKey */ .L8.encodeEd25519PublicKey(
           tx.sourceAccountEd25519.toBytes()
         );
         break;
       default:
-        this._source = (0,_util_decode_encode_muxed_account_js__WEBPACK_IMPORTED_MODULE_4__/* .encodeMuxedAccountToAddress */ .aQ)(
+        this._source = (0,_util_decode_encode_muxed_account_js__WEBPACK_IMPORTED_MODULE_3__/* .encodeMuxedAccountToAddress */ .aQ)(
           tx.sourceAccount
         );
         break;
@@ -47719,7 +47917,7 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
     }
     const operations = tx.operations || [];
     this._operations = operations.map(
-      (op) => _operation_js__WEBPACK_IMPORTED_MODULE_5__/* .Operation */ .I.fromXdrObject(op)
+      (op) => _operation_js__WEBPACK_IMPORTED_MODULE_4__/* .Operation */ .I.fromXdrObject(op)
     );
   }
   /**
@@ -47796,7 +47994,7 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
   }
   /** The memo attached to this transaction. */
   get memo() {
-    return _memo_js__WEBPACK_IMPORTED_MODULE_6__/* .Memo */ .lD.fromXdrObject(this._memo);
+    return _memo_js__WEBPACK_IMPORTED_MODULE_5__/* .Memo */ .lD.fromXdrObject(this._memo);
   }
   set memo(_value) {
     throw new Error("Transaction is immutable");
@@ -47812,8 +48010,8 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
   signatureBase() {
     let tx = this.tx;
     if (this._envelopeType === "envelopeTypeTxV0") {
-      tx = _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_7__/* .Transaction */ .Z.fromXdr(
-        (0,uint8array_extras__WEBPACK_IMPORTED_MODULE_8__/* .concatUint8Arrays */ .VE)([
+      tx = _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_6__/* .Transaction */ .Z.fromXdr(
+        (0,uint8array_extras__WEBPACK_IMPORTED_MODULE_7__/* .concatUint8Arrays */ .VE)([
           // TransactionV0 is a transaction with the AccountID discriminant
           // stripped off, we need to put it back to build a valid transaction
           // which we can use to build a TransactionSignaturePayloadTaggedTransaction
@@ -47823,11 +48021,11 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
         ])
       );
     }
-    const taggedTransaction = _xdr_generated_transaction_signature_payload_tagged_transaction_js__WEBPACK_IMPORTED_MODULE_9__/* .TransactionSignaturePayloadTaggedTransaction */ .JO.envelopeTypeTx(
+    const taggedTransaction = _xdr_generated_transaction_signature_payload_tagged_transaction_js__WEBPACK_IMPORTED_MODULE_8__/* .TransactionSignaturePayloadTaggedTransaction */ .JO.envelopeTypeTx(
       tx
     );
-    const txSignature = new _xdr_generated_transaction_signature_payload_js__WEBPACK_IMPORTED_MODULE_10__/* .TransactionSignaturePayload */ .Z({
-      networkId: _xdr_generated_hash_js__WEBPACK_IMPORTED_MODULE_11__/* .Hash */ .V.fromXdr((0,_hashing_js__WEBPACK_IMPORTED_MODULE_12__/* .hash */ .t)(this.networkPassphrase)),
+    const txSignature = new _xdr_generated_transaction_signature_payload_js__WEBPACK_IMPORTED_MODULE_9__/* .TransactionSignaturePayload */ .Z({
+      networkId: _xdr_generated_hash_js__WEBPACK_IMPORTED_MODULE_10__/* .Hash */ .V.fromXdr((0,_hashing_js__WEBPACK_IMPORTED_MODULE_11__/* .hash */ .t)(this.networkPassphrase)),
       taggedTransaction
     });
     return txSignature.toXdr();
@@ -47841,7 +48039,7 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
     let envelope;
     switch (this._envelopeType) {
       case "envelopeTypeTxV0":
-        envelope = _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_2__/* .TransactionEnvelope */ .BB.envelopeTypeTxV0(
+        envelope = _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_12__/* .TransactionEnvelope */ .BB.envelopeTypeTxV0(
           new _xdr_generated_transaction_v0_envelope_js__WEBPACK_IMPORTED_MODULE_13__/* .TransactionV0Envelope */ .$({
             tx: _xdr_generated_transaction_v0_js__WEBPACK_IMPORTED_MODULE_14__/* .TransactionV0 */ .D.fromXdr(rawTx),
             // make a copy of tx
@@ -47850,9 +48048,9 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
         );
         break;
       case "envelopeTypeTx":
-        envelope = _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_2__/* .TransactionEnvelope */ .BB.envelopeTypeTx(
+        envelope = _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_12__/* .TransactionEnvelope */ .BB.envelopeTypeTx(
           new _xdr_generated_transaction_v1_envelope_js__WEBPACK_IMPORTED_MODULE_15__/* .TransactionV1Envelope */ .Q({
-            tx: _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_7__/* .Transaction */ .Z.fromXdr(rawTx),
+            tx: _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_6__/* .Transaction */ .Z.fromXdr(rawTx),
             // make a copy of tx
             signatures
           })
@@ -47885,7 +48083,7 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
       throw new RangeError("invalid operation index");
     }
     try {
-      _operation_js__WEBPACK_IMPORTED_MODULE_5__/* .Operation */ .I.createClaimableBalance(
+      _operation_js__WEBPACK_IMPORTED_MODULE_4__/* .Operation */ .I.createClaimableBalance(
         op
       );
     } catch (err) {
@@ -47893,8 +48091,8 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
         `expected createClaimableBalance, got ${op.type}: ${String(err)}`
       );
     }
-    const account = _strkey_js__WEBPACK_IMPORTED_MODULE_3__/* .StrKey */ .L8.decodeEd25519PublicKey(
-      (0,_util_decode_encode_muxed_account_js__WEBPACK_IMPORTED_MODULE_4__/* .extractBaseAddress */ .Rm)(this.source)
+    const account = _strkey_js__WEBPACK_IMPORTED_MODULE_2__/* .StrKey */ .L8.decodeEd25519PublicKey(
+      (0,_util_decode_encode_muxed_account_js__WEBPACK_IMPORTED_MODULE_3__/* .extractBaseAddress */ .Rm)(this.source)
     );
     const operationId = _xdr_generated_hash_id_preimage_js__WEBPACK_IMPORTED_MODULE_16__/* .HashIdPreimage */ .co.envelopeTypeOpId(
       new _xdr_generated_hash_id_preimage_operation_id_js__WEBPACK_IMPORTED_MODULE_17__/* .HashIdPreimageOperationId */ .Y({
@@ -47903,9 +48101,9 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
         opNum: opIndex
       })
     );
-    const opIdHash = (0,_hashing_js__WEBPACK_IMPORTED_MODULE_12__/* .hash */ .t)(operationId.toXdr("raw"));
+    const opIdHash = (0,_hashing_js__WEBPACK_IMPORTED_MODULE_11__/* .hash */ .t)(operationId.toXdr("raw"));
     const balanceId = _xdr_generated_claimable_balance_id_js__WEBPACK_IMPORTED_MODULE_20__/* .ClaimableBalanceId */ ._.claimableBalanceIdTypeV0(
-      new _xdr_generated_hash_js__WEBPACK_IMPORTED_MODULE_11__/* .Hash */ .V(opIdHash)
+      new _xdr_generated_hash_js__WEBPACK_IMPORTED_MODULE_10__/* .Hash */ .V(opIdHash)
     );
     return balanceId.toXdr("hex");
   }
@@ -47921,16 +48119,19 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
-/* harmony export */   O: () => (/* binding */ TransactionBase)
+/* harmony export */   H9: () => (/* binding */ markSdkOwned),
+/* harmony export */   OB: () => (/* binding */ TransactionBase),
+/* harmony export */   px: () => (/* binding */ ownEnvelope)
 /* harmony export */ });
-/* harmony import */ var uint8array_extras__WEBPACK_IMPORTED_MODULE_6__ = __nccwpck_require__(5770);
-/* harmony import */ var _util_base64_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(5601);
-/* harmony import */ var _hashing_js__WEBPACK_IMPORTED_MODULE_7__ = __nccwpck_require__(7935);
-/* harmony import */ var _keypair_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(8477);
-/* harmony import */ var _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9598);
-/* harmony import */ var _xdr_generated_transaction_v0_js__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(4098);
-/* harmony import */ var _xdr_generated_fee_bump_transaction_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(1570);
-/* harmony import */ var _xdr_generated_decorated_signature_js__WEBPACK_IMPORTED_MODULE_5__ = __nccwpck_require__(4938);
+/* harmony import */ var uint8array_extras__WEBPACK_IMPORTED_MODULE_7__ = __nccwpck_require__(5770);
+/* harmony import */ var _util_base64_js__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5601);
+/* harmony import */ var _hashing_js__WEBPACK_IMPORTED_MODULE_8__ = __nccwpck_require__(7935);
+/* harmony import */ var _keypair_js__WEBPACK_IMPORTED_MODULE_5__ = __nccwpck_require__(8477);
+/* harmony import */ var _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(9598);
+/* harmony import */ var _xdr_generated_transaction_v0_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(4098);
+/* harmony import */ var _xdr_generated_fee_bump_transaction_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(1570);
+/* harmony import */ var _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9675);
+/* harmony import */ var _xdr_generated_decorated_signature_js__WEBPACK_IMPORTED_MODULE_6__ = __nccwpck_require__(4938);
 
 
 
@@ -47941,6 +48142,38 @@ class Transaction extends _transaction_base_js__WEBPACK_IMPORTED_MODULE_0__/* .T
 
 
 
+
+const sdkOwned = /* @__PURE__ */ new WeakSet();
+function markSdkOwned(envelope) {
+  sdkOwned.add(envelope);
+  return envelope;
+}
+function ownEnvelope(envelope, isExpected, expected) {
+  const isString = typeof envelope === "string";
+  const input = isString ? _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_0__/* .TransactionEnvelope */ .BB.fromXdr((0,_util_base64_js__WEBPACK_IMPORTED_MODULE_1__/* .base64ToUint8Array */ .E)(envelope)) : envelope;
+  if (!isExpected(input)) {
+    throw new Error(
+      `Invalid TransactionEnvelope: expected an ${expected} but received an ${input.type}.`
+    );
+  }
+  if (isString || sdkOwned.has(input)) {
+    return input;
+  }
+  let own;
+  try {
+    own = _xdr_generated_transaction_envelope_js__WEBPACK_IMPORTED_MODULE_0__/* .TransactionEnvelope */ .BB.fromXdr(input.toXdr());
+  } catch (error) {
+    throw new Error(
+      `Invalid TransactionEnvelope: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  if (!isExpected(own)) {
+    throw new Error(
+      `TransactionEnvelope changed type in the copy: ${input.type} became ${own.type}.`
+    );
+  }
+  return own;
+}
 class TransactionBase {
   _tx;
   _signatures;
@@ -47974,14 +48207,14 @@ class TransactionBase {
    */
   get tx() {
     const buf = this._tx.toXdr();
-    if (this._tx instanceof _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_0__/* .Transaction */ .Z) {
-      return _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_0__/* .Transaction */ .Z.fromXdr(buf);
+    if (this._tx instanceof _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_2__/* .Transaction */ .Z) {
+      return _xdr_generated_transaction_js__WEBPACK_IMPORTED_MODULE_2__/* .Transaction */ .Z.fromXdr(buf);
     }
-    if (this._tx instanceof _xdr_generated_transaction_v0_js__WEBPACK_IMPORTED_MODULE_1__/* .TransactionV0 */ .D) {
-      return _xdr_generated_transaction_v0_js__WEBPACK_IMPORTED_MODULE_1__/* .TransactionV0 */ .D.fromXdr(buf);
+    if (this._tx instanceof _xdr_generated_transaction_v0_js__WEBPACK_IMPORTED_MODULE_3__/* .TransactionV0 */ .D) {
+      return _xdr_generated_transaction_v0_js__WEBPACK_IMPORTED_MODULE_3__/* .TransactionV0 */ .D.fromXdr(buf);
     }
-    if (this._tx instanceof _xdr_generated_fee_bump_transaction_js__WEBPACK_IMPORTED_MODULE_2__/* .FeeBumpTransaction */ .P) {
-      return _xdr_generated_fee_bump_transaction_js__WEBPACK_IMPORTED_MODULE_2__/* .FeeBumpTransaction */ .P.fromXdr(buf);
+    if (this._tx instanceof _xdr_generated_fee_bump_transaction_js__WEBPACK_IMPORTED_MODULE_4__/* .FeeBumpTransaction */ .P) {
+      return _xdr_generated_fee_bump_transaction_js__WEBPACK_IMPORTED_MODULE_4__/* .FeeBumpTransaction */ .P.fromXdr(buf);
     }
     throw new Error("Unknown transaction type");
   }
@@ -48037,7 +48270,7 @@ class TransactionBase {
    * @param keypair - Keypair of signer
    */
   getKeypairSignature(keypair) {
-    return (0,_util_base64_js__WEBPACK_IMPORTED_MODULE_3__/* .uint8ArrayToBase64 */ .Y)(keypair.sign(this.hash()));
+    return (0,_util_base64_js__WEBPACK_IMPORTED_MODULE_1__/* .uint8ArrayToBase64 */ .Y)(keypair.sign(this.hash()));
   }
   /**
    * Add a signature to the transaction. Useful when a party wants to pre-sign
@@ -48071,9 +48304,9 @@ class TransactionBase {
     }
     let keypair;
     let hint;
-    const signatureBytes = (0,_util_base64_js__WEBPACK_IMPORTED_MODULE_3__/* .base64ToUint8Array */ .E)(signature);
+    const signatureBytes = (0,_util_base64_js__WEBPACK_IMPORTED_MODULE_1__/* .base64ToUint8Array */ .E)(signature);
     try {
-      keypair = _keypair_js__WEBPACK_IMPORTED_MODULE_4__/* .Keypair */ .A.fromPublicKey(publicKey);
+      keypair = _keypair_js__WEBPACK_IMPORTED_MODULE_5__/* .Keypair */ .A.fromPublicKey(publicKey);
       hint = keypair.signatureHint();
     } catch {
       throw new Error("Invalid publicKey");
@@ -48082,7 +48315,7 @@ class TransactionBase {
       throw new Error("Invalid signature");
     }
     this.signatures.push(
-      new _xdr_generated_decorated_signature_js__WEBPACK_IMPORTED_MODULE_5__/* .DecoratedSignature */ .O({
+      new _xdr_generated_decorated_signature_js__WEBPACK_IMPORTED_MODULE_6__/* .DecoratedSignature */ .O({
         hint,
         signature: signatureBytes
       })
@@ -48105,21 +48338,21 @@ class TransactionBase {
    */
   signHashX(preimage) {
     if (typeof preimage === "string") {
-      preimage = (0,uint8array_extras__WEBPACK_IMPORTED_MODULE_6__/* .hexToUint8Array */ .AS)(preimage);
+      preimage = (0,uint8array_extras__WEBPACK_IMPORTED_MODULE_7__/* .hexToUint8Array */ .AS)(preimage);
     }
     if (preimage.length > 64) {
       throw new Error("preimage cannot be longer than 64 bytes");
     }
     const signature = preimage;
-    const hashX = (0,_hashing_js__WEBPACK_IMPORTED_MODULE_7__/* .hash */ .t)(preimage);
+    const hashX = (0,_hashing_js__WEBPACK_IMPORTED_MODULE_8__/* .hash */ .t)(preimage);
     const hint = hashX.subarray(hashX.length - 4);
-    this.signatures.push(new _xdr_generated_decorated_signature_js__WEBPACK_IMPORTED_MODULE_5__/* .DecoratedSignature */ .O({ hint, signature }));
+    this.signatures.push(new _xdr_generated_decorated_signature_js__WEBPACK_IMPORTED_MODULE_6__/* .DecoratedSignature */ .O({ hint, signature }));
   }
   /**
    * Returns a hash for this transaction, suitable for signing.
    */
   hash() {
-    return (0,_hashing_js__WEBPACK_IMPORTED_MODULE_7__/* .hash */ .t)(this.signatureBase());
+    return (0,_hashing_js__WEBPACK_IMPORTED_MODULE_8__/* .hash */ .t)(this.signatureBase());
   }
   /** Returns the signature base for this transaction, to be overridden by subclasses. */
   signatureBase() {
@@ -48178,20 +48411,6 @@ var decode_encode_muxed_account = __nccwpck_require__(4473);
 
 
 
-const MAX_UINT64 = BigInt("18446744073709551615");
-function validateUint64Id(id) {
-  let value;
-  try {
-    value = BigInt(id);
-  } catch {
-    throw new Error(`id is not a valid uint64 string: ${id}`);
-  }
-  if (value < BigInt(0) || value > MAX_UINT64) {
-    throw new Error(
-      `id value out of range for uint64 [0, ${MAX_UINT64}]: ${id}`
-    );
-  }
-}
 class MuxedAccount {
   account;
   _muxedXdr;
@@ -48200,19 +48419,19 @@ class MuxedAccount {
   /**
    * @param baseAccount - the {@link Account} instance representing the
    *     underlying G... address
-   * @param id - a stringified uint64 value that represents the ID of the
-   *     muxed account
+   * @param id - the ID of the muxed account, as a uint64 in decimal digits.
+   *     Leading zeros are removed. At most 22 digits.
    */
   constructor(baseAccount, id) {
     const accountId = baseAccount.accountId();
     if (!strkey/* StrKey */.L8.isValidEd25519PublicKey(accountId)) {
       throw new Error("accountId is invalid");
     }
-    validateUint64Id(id);
+    const canonicalId = (0,decode_encode_muxed_account/* canonicalUint64Id */.m9)(id);
     this.account = baseAccount;
-    this._muxedXdr = (0,decode_encode_muxed_account/* encodeMuxedAccount */.B_)(accountId, id);
+    this._muxedXdr = (0,decode_encode_muxed_account/* encodeMuxedAccount */.B_)(accountId, canonicalId);
     this._mAddress = (0,decode_encode_muxed_account/* encodeMuxedAccountToAddress */.aQ)(this._muxedXdr);
-    this._id = id;
+    this._id = canonicalId;
   }
   /**
    * Parses an M-address into a MuxedAccount object.
@@ -48254,16 +48473,14 @@ class MuxedAccount {
   /**
    * Updates the muxed account's ID, regenerating the M-address accordingly.
    *
-   * @param id - a stringified uint64 value to set as the new muxed account ID
+   * @param id - the new muxed account ID, as a uint64 in decimal digits.
+   *     Leading zeros are removed. At most 22 digits.
    */
   setId(id) {
-    if (typeof id !== "string") {
-      throw new Error("id should be a string representing a number (uint64)");
-    }
-    validateUint64Id(id);
-    this._muxedXdr = (0,decode_encode_muxed_account/* encodeMuxedAccount */.B_)(this.account.accountId(), id);
+    const canonicalId = (0,decode_encode_muxed_account/* canonicalUint64Id */.m9)(id);
+    this._muxedXdr = (0,decode_encode_muxed_account/* encodeMuxedAccount */.B_)(this.account.accountId(), canonicalId);
     this._mAddress = (0,decode_encode_muxed_account/* encodeMuxedAccountToAddress */.aQ)(this._muxedXdr);
-    this._id = id;
+    this._id = canonicalId;
     return this;
   }
   /**
@@ -48309,6 +48526,8 @@ class MuxedAccount {
 var transaction = __nccwpck_require__(7271);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/fee_bump_transaction.js
 var fee_bump_transaction = __nccwpck_require__(7221);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/transaction_base.js
+var transaction_base = __nccwpck_require__(7164);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/base/sorobandata_builder.js
 var sorobandata_builder = __nccwpck_require__(7229);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/signer-key.js + 1 modules
@@ -48439,8 +48658,8 @@ var ledger_key = __nccwpck_require__(8678);
 var ledger_key_contract_data = __nccwpck_require__(4783);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/contract-data-durability.js
 var contract_data_durability = __nccwpck_require__(3079);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 5 modules
-var sc_val = __nccwpck_require__(9679);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 4 modules
+var sc_val = __nccwpck_require__(8497);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-key-account.js
 var ledger_key_account = __nccwpck_require__(2705);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-key-trust-line.js
@@ -48508,7 +48727,21 @@ var fee_bump_transaction_envelope = __nccwpck_require__(7815);
 
 
 
+
 const UINT32_MAX = 4294967295;
+const MAX_RESOURCE_FEE = 2n ** 50n;
+function checkResourceFee(resourceFee) {
+  if (resourceFee < 0n || resourceFee > MAX_RESOURCE_FEE) {
+    throw new Error(
+      `Invalid resourceFee ${resourceFee}: must be between 0 and ${MAX_RESOURCE_FEE}`
+    );
+  }
+}
+const SOROBAN_OPERATION_TYPES = /* @__PURE__ */ new Set([
+  "invokeHostFunction",
+  "extendFootprintTtl",
+  "restoreFootprint"
+]);
 const BASE_FEE = "100";
 const TimeoutInfinite = 0;
 class TransactionBuilder {
@@ -48600,6 +48833,8 @@ class TransactionBuilder {
    *    as needed, instead..
    *
    * **TODO:** This cannot clone {@link FeeBumpTransaction}s, yet.
+   *
+   * @throws If the transaction's `resourceFee` is below 0 or above 2^50.
    */
   static cloneFrom(tx, opts = {}) {
     if (!(tx instanceof transaction/* Transaction */.Z)) {
@@ -48626,15 +48861,18 @@ class TransactionBuilder {
       sorobanData = ext.type === "sorobanData" ? ext.value : void 0;
     }
     let totalFee = parseInt(tx.fee, 10);
+    let zeroInclusionFee = false;
     if (sorobanData) {
-      const resourceFee = Number(sorobanData.resourceFee.toString());
+      checkResourceFee(sorobanData.resourceFee);
+      const resourceFee = Number(sorobanData.resourceFee);
+      zeroInclusionFee = totalFee === resourceFee;
       if (totalFee - resourceFee > 0) {
         totalFee -= resourceFee;
       }
     }
     const unscaledFee = Math.floor(totalFee / tx.operations.length);
     const builderOpts = {
-      fee: (unscaledFee || BASE_FEE).toString(),
+      fee: (zeroInclusionFee ? 0 : unscaledFee || BASE_FEE).toString(),
       memo: tx.memo,
       networkPassphrase: tx.networkPassphrase
     };
@@ -48731,7 +48969,8 @@ class TransactionBuilder {
    *
    * @param timeoutSeconds - Number of seconds the transaction is good.
    *     Can't be negative. If the value is {@link TimeoutInfinite}, the
-   *     transaction is good indefinitely.
+   *     transaction is good indefinitely. An existing `minTime` is kept in
+   *     both cases, and a timeout that ends before it throws.
    *
    * @see {@link TimeoutInfinite}
    * @see https://developers.stellar.org/docs/tutorials/handling-errors/
@@ -48745,21 +48984,18 @@ class TransactionBuilder {
     if (timeoutSeconds < 0) {
       throw new Error("timeout cannot be negative");
     }
+    const minTime = this.timebounds?.minTime ?? 0;
     if (timeoutSeconds > 0) {
       const timeoutTimestamp = Math.floor(Date.now() / 1e3) + timeoutSeconds;
-      if (this.timebounds === null) {
-        this.timebounds = { minTime: 0, maxTime: timeoutTimestamp };
-      } else {
-        this.timebounds = {
-          minTime: this.timebounds.minTime ?? 0,
-          maxTime: timeoutTimestamp
-        };
+      const minSeconds = toEpochSeconds(minTime) ?? 0;
+      if (minSeconds > timeoutTimestamp) {
+        throw new Error(
+          `timeout ends before min_time (${timeoutTimestamp} < ${minSeconds})`
+        );
       }
+      this.timebounds = { minTime, maxTime: timeoutTimestamp };
     } else {
-      this.timebounds = {
-        minTime: 0,
-        maxTime: 0
-      };
+      this.timebounds = { minTime, maxTime: 0 };
     }
     return this;
   }
@@ -48967,12 +49203,15 @@ class TransactionBuilder {
    * This method removes the need for simulation by handling the creation of the
    * appropriate authorization entries and ledger footprint for the transfer operation.
    *
-   * @param destination - the address of the recipient of the SAC transfer (should be a valid Stellar address or contract ID)
+   * @param destination - the address of the recipient of the SAC transfer (a G, M, C or W address)
    * @param asset - the SAC asset to be transferred
    * @param amount - the amount of tokens to be transferred in 7 decimals. IE 1 token with 7 decimals of precision would be represented as "1_0000000"
    * @param sorobanFees - optional Soroban fees for the transaction to override the default fees used
+   *
+   * @throws If the builder's source is a muxed (`M...`) account.
    */
   addSacTransferOperation(destination, asset, amount, sorobanFees) {
+    this.assertSorobanSourceNotMuxed();
     if (BigInt(amount) <= 0n) {
       throw new Error("Amount must be a positive integer");
     } else if (BigInt(amount) > xdr/* Int64 */.CGN.MAX_VALUE) {
@@ -49002,7 +49241,7 @@ class TransactionBuilder {
         );
       }
     }
-    const isDestinationContract = strkey/* StrKey */.L8.isValidContract(destination);
+    const isDestinationContract = strkey/* StrKey */.L8.isValidContract(destination) || strkey/* StrKey */.L8.isValidMuxedContract(destination);
     if (!isDestinationContract) {
       if (!strkey/* StrKey */.L8.isValidEd25519PublicKey(destination) && !strkey/* StrKey */.L8.isValidMed25519PublicKey(destination)) {
         throw new Error(
@@ -49010,8 +49249,9 @@ class TransactionBuilder {
         );
       }
     }
-    const destinationBaseAddress = isDestinationContract ? destination : (0,decode_encode_muxed_account/* extractBaseAddress */.Rm)(destination);
-    if (destinationBaseAddress === (0,decode_encode_muxed_account/* extractBaseAddress */.Rm)(this.source.accountId())) {
+    const destinationBaseAddress = (0,decode_encode_muxed_account/* extractBaseAddress */.Rm)(destination);
+    const source = this.source.accountId();
+    if (destinationBaseAddress === source) {
       throw new Error("Destination cannot be the same as the source account.");
     }
     if (this.networkPassphrase === null) {
@@ -49021,8 +49261,6 @@ class TransactionBuilder {
     }
     const contractId = asset.contractId(this.networkPassphrase);
     const functionName = "transfer";
-    const source = this.source.accountId();
-    const sourceBaseAddress = (0,decode_encode_muxed_account/* extractBaseAddress */.Rm)(source);
     const args = [
       (0,scval/* nativeToScVal */.o5)(source, { type: "address" }),
       (0,scval/* nativeToScVal */.o5)(destination, { type: "address" }),
@@ -49061,7 +49299,7 @@ class TransactionBuilder {
             contract: address/* Address */.p.fromString(contractId).toScAddress(),
             key: sc_val/* ScVal */.wq.scvVec([
               (0,scval/* nativeToScVal */.o5)("Balance", { type: "symbol" }),
-              (0,scval/* nativeToScVal */.o5)(destination, { type: "address" })
+              (0,scval/* nativeToScVal */.o5)(destinationBaseAddress, { type: "address" })
             ]),
             durability: contract_data_durability/* ContractDataDurability */.A.persistent
           })
@@ -49106,15 +49344,15 @@ class TransactionBuilder {
       footprint.readWrite.push(
         ledger_key/* LedgerKey */.DU.account(
           new ledger_key_account/* LedgerKeyAccount */.e({
-            accountId: keypair/* Keypair */.A.fromPublicKey(sourceBaseAddress).xdrPublicKey()
+            accountId: keypair/* Keypair */.A.fromPublicKey(source).xdrPublicKey()
           })
         )
       );
-    } else if (asset.getIssuer() !== sourceBaseAddress) {
+    } else if (asset.getIssuer() !== source) {
       footprint.readWrite.push(
         ledger_key/* LedgerKey */.DU.trustline(
           new ledger_key_trust_line/* LedgerKeyTrustLine */.v({
-            accountId: keypair/* Keypair */.A.fromPublicKey(sourceBaseAddress).xdrPublicKey(),
+            accountId: keypair/* Keypair */.A.fromPublicKey(source).xdrPublicKey(),
             asset: asset.toTrustLineXdrObject()
           })
         )
@@ -49147,11 +49385,42 @@ class TransactionBuilder {
     this.setSorobanData(sorobanData);
     return this.addOperation(operation);
   }
+  // Core rejects any Soroban transaction with a muxed source account.
+  assertSorobanSourceNotMuxed() {
+    if (strkey/* StrKey */.L8.isValidMed25519PublicKey(this.source.accountId())) {
+      throw new Error(
+        "Soroban transactions cannot use a muxed source account; use the base account"
+      );
+    }
+  }
+  // Core also rejects a muxed operation source and a memo.
+  assertValidSoroban() {
+    this.assertSorobanSourceNotMuxed();
+    if (this.operations.some(
+      (op) => op.sourceAccount?.type === "keyTypeMuxedEd25519"
+    )) {
+      throw new Error(
+        "Soroban operations cannot use a muxed source account; use the base account"
+      );
+    }
+    if (this.memo.type !== "none") {
+      throw new Error("Soroban transactions cannot have a memo");
+    }
+  }
   /**
    * Builds the transaction and increments the source account's sequence
    * number by 1.
+   *
+   * @throws If a Soroban transaction has a muxed (`M...`) source account,
+   *    on the transaction or an operation, or has a memo. Also if the Soroban
+   *    data's `resourceFee` is below 0, or if the total fee is above the uint32
+   *    maximum.
    */
   build() {
+    const isSoroban = this.sorobanData !== null || this.operations.some((op) => SOROBAN_OPERATION_TYPES.has(op.body.type));
+    if (isSoroban) {
+      this.assertValidSoroban();
+    }
     const sequenceNumber = new bignumber/* default */.A(this.source.sequenceNumber()).plus(1);
     const fee = new bignumber/* default */.A(this.baseFee).times(this.operations.length).toNumber();
     if (fee > UINT32_MAX) {
@@ -49218,6 +49487,7 @@ class TransactionBuilder {
           `Total fee (baseFee * operations + resourceFee) exceeds the maximum uint32 value (${UINT32_MAX}). Got ${attrs.fee}.`
         );
       }
+      checkResourceFee(this.sorobanData.resourceFee);
     } else {
       attrs.ext = transaction_ext/* TransactionExt */.wU.v0();
     }
@@ -49263,6 +49533,8 @@ class TransactionBuilder {
    *
    * Your fee-bump amount should be `>= 10x` the original fee.
    * @see  https://developers.stellar.org/docs/glossary/fee-bumps/#replace-by-fee
+   *
+   * @throws If the inner transaction's `resourceFee` is below 0 or above 2^50.
    */
   static buildFeeBumpTransaction(feeSource, baseFee, innerTx, networkPassphrase) {
     const innerOps = innerTx.operations.length;
@@ -49273,7 +49545,10 @@ class TransactionBuilder {
       case "envelopeTypeTx": {
         const ext = env.value.tx.ext;
         const sorobanData = ext.type === "sorobanData" ? ext.value : void 0;
-        resourceFee = new bignumber/* default */.A(sorobanData?.resourceFee.toString() ?? 0);
+        if (sorobanData) {
+          checkResourceFee(sorobanData.resourceFee);
+          resourceFee = new bignumber/* default */.A(sorobanData.resourceFee.toString());
+        }
         break;
       }
     }
@@ -49350,7 +49625,7 @@ class TransactionBuilder {
    */
   static fromXdr(envelope, networkPassphrase) {
     if (typeof envelope === "string") {
-      envelope = transaction_envelope/* TransactionEnvelope */.BB.fromXdr(envelope, "base64");
+      envelope = (0,transaction_base/* markSdkOwned */.H9)(transaction_envelope/* TransactionEnvelope */.BB.fromXdr(envelope, "base64"));
     }
     if (envelope.type === "envelopeTypeTxFeeBump") {
       return new fee_bump_transaction/* FeeBumpTransaction */.P(envelope, networkPassphrase);
@@ -52573,8 +52848,10 @@ const bignumber_BigNumber = bignumber.clone({ STRICT: true });
 /* harmony export */   Ag: () => (/* binding */ decodeAddressToMuxedAccount),
 /* harmony export */   B_: () => (/* binding */ encodeMuxedAccount),
 /* harmony export */   Rm: () => (/* binding */ extractBaseAddress),
-/* harmony export */   aQ: () => (/* binding */ encodeMuxedAccountToAddress)
+/* harmony export */   aQ: () => (/* binding */ encodeMuxedAccountToAddress),
+/* harmony export */   m9: () => (/* binding */ canonicalUint64Id)
 /* harmony export */ });
+/* unused harmony export encodeMuxedContractAddress */
 /* harmony import */ var uint8array_extras__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(5770);
 /* harmony import */ var _xdr_index_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(8940);
 /* harmony import */ var _strkey_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(3697);
@@ -52586,6 +52863,28 @@ const bignumber_BigNumber = bignumber.clone({ STRICT: true });
 
 
 
+const MAX_UINT64 = BigInt("18446744073709551615");
+function canonicalUint64Id(id) {
+  return parseUint64Id(id).toString();
+}
+function parseUint64Id(id) {
+  if (typeof id !== "string") {
+    throw new Error("id should be a string representing a number (uint64)");
+  }
+  if (id.length > 22) {
+    throw new Error("id must have at most 22 digits");
+  }
+  if (!/^\d+$/.test(id)) {
+    throw new Error(`id is not a valid uint64 string: ${id}`);
+  }
+  const value = BigInt(id);
+  if (value > MAX_UINT64) {
+    throw new Error(
+      `id value out of range for uint64 [0, ${MAX_UINT64}]: ${id}`
+    );
+  }
+  return value;
+}
 function decodeAddressToMuxedAccount(address) {
   if (_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidMed25519PublicKey(address)) {
     return _decodeAddressFullyToMuxedAccount(address);
@@ -52602,22 +52901,34 @@ function encodeMuxedAccount(address, id) {
   if (!_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidEd25519PublicKey(address)) {
     throw new Error("address should be a Stellar account ID (G...)");
   }
-  if (typeof id !== "string") {
-    throw new Error("id should be a string representing a number (uint64)");
-  }
   return _xdr_generated_muxed_account_js__WEBPACK_IMPORTED_MODULE_1__/* .MuxedAccount */ .HW.keyTypeMuxedEd25519(
     new _xdr_generated_muxed_account_med25519_js__WEBPACK_IMPORTED_MODULE_2__/* .MuxedAccountMed25519 */ .b({
-      id: _xdr_index_js__WEBPACK_IMPORTED_MODULE_3__/* .Uint64 */ .Rf3.fromString(id),
+      id: _xdr_index_js__WEBPACK_IMPORTED_MODULE_3__/* .Uint64 */ .Rf3.fromString(canonicalUint64Id(id)),
       ed25519: _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.decodeEd25519PublicKey(address)
     })
   );
 }
+function encodeMuxedContractAddress(contractId, id) {
+  if (!StrKey.isValidContract(contractId)) {
+    throw new Error("contractId should be a contract address (C...)");
+  }
+  return StrKey.encodeMuxedContract(
+    packMuxedContract(StrKey.decodeContract(contractId), parseUint64Id(id))
+  );
+}
 function extractBaseAddress(address) {
-  if (_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidEd25519PublicKey(address)) {
+  if (_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidEd25519PublicKey(address) || _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidContract(address)) {
     return address;
   }
+  if (_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidMuxedContract(address)) {
+    return _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.encodeContract(
+      _strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.decodeMuxedContract(address).subarray(0, 32)
+    );
+  }
   if (!_strkey_js__WEBPACK_IMPORTED_MODULE_0__/* .StrKey */ .L8.isValidMed25519PublicKey(address)) {
-    throw new TypeError(`expected muxed account (M...), got ${address}`);
+    throw new TypeError(
+      `expected an account or contract address (G..., M..., C... or W...), got ${address}`
+    );
   }
   const muxedAccount = decodeAddressToMuxedAccount(address);
   if (muxedAccount.type !== "keyTypeMuxedEd25519") {
@@ -52666,6 +52977,30 @@ var Api;
     GetTransactionStatus2["NOT_FOUND"] = "NOT_FOUND";
     GetTransactionStatus2["FAILED"] = "FAILED";
   })(Api2.GetTransactionStatus || (Api2.GetTransactionStatus = {}));
+  ((QueryEventsScanStatus2) => {
+    QueryEventsScanStatus2["HAS_MORE"] = "HAS_MORE";
+    QueryEventsScanStatus2["WAITING_FOR_LEDGERS"] = "WAITING_FOR_LEDGERS";
+    QueryEventsScanStatus2["OLDEST_REACHED"] = "OLDEST_REACHED";
+    QueryEventsScanStatus2["COMPLETE"] = "COMPLETE";
+  })(Api2.QueryEventsScanStatus || (Api2.QueryEventsScanStatus = {}));
+  Api2.QUERY_EVENTS_INVALID_PARAMS = -32602;
+  const QUERY_EVENTS_ERROR_REASONS = /* @__PURE__ */ new Set([
+    "invalid_params",
+    "ledger_out_of_range",
+    "cursor_malformed"
+  ]);
+  function isQueryEventsError(err) {
+    if (typeof err !== "object" || err === null) {
+      return false;
+    }
+    const { code, data } = err;
+    if (code !== Api2.QUERY_EVENTS_INVALID_PARAMS || typeof data !== "object" || data === null) {
+      return false;
+    }
+    const { reason } = data;
+    return typeof reason === "string" && QUERY_EVENTS_ERROR_REASONS.has(reason);
+  }
+  Api2.isQueryEventsError = isQueryEventsError;
   function isSimulationError(sim) {
     return "error" in sim;
   }
@@ -52690,7 +53025,7 @@ var Api;
 
 /***/ }),
 
-/***/ 1875:
+/***/ 9350:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 
@@ -52700,6 +53035,7 @@ __nccwpck_require__.d(__webpack_exports__, {
   CA: () => (/* binding */ parseRawLatestLedger),
   $E: () => (/* binding */ parseRawLedger),
   $D: () => (/* binding */ parseRawLedgerEntries),
+  B5: () => (/* binding */ parseRawQueryEvents),
   Af: () => (/* binding */ parseRawSendTransaction),
   jr: () => (/* binding */ parseRawSimulation),
   tR: () => (/* binding */ parseRawTransactions),
@@ -52726,8 +53062,903 @@ var contract_event = __nccwpck_require__(3322);
 var js_xdr = __nccwpck_require__(5133);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/xdr-value.js + 2 modules
 var xdr_value = __nccwpck_require__(7690);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/hash.js
+var hash = __nccwpck_require__(4448);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/bytes-value.js
+var bytes_value = __nccwpck_require__(5632);
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/upgrade-type.js
+
+
+
+class UpgradeType extends bytes_value/* BytesValue */.v {
+  static encoding = "hex";
+  static schema = (0,js_xdr/* varOpaque */.bj)(128, "UpgradeType");
+  static fromXdrObject(wire) {
+    return new UpgradeType(wire);
+  }
+}
+
+
+//# sourceMappingURL=upgrade-type.js.map
+
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/enum-value.js
 var enum_value = __nccwpck_require__(882);
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/stellar-value-type.js
+
+
+
+class StellarValueType extends enum_value/* EnumValue */.RS {
+  static stellarValueBasic = new StellarValueType(
+    "stellarValueBasic",
+    0
+  );
+  static stellarValueSigned = new StellarValueType(
+    "stellarValueSigned",
+    1
+  );
+  static stellarValueEmptyTxSet = new StellarValueType(
+    "stellarValueEmptyTxSet",
+    2
+  );
+  static stellarValueSignedMs = new StellarValueType(
+    "stellarValueSignedMs",
+    3
+  );
+  static stellarValueEmptyTxSetMs = new StellarValueType(
+    "stellarValueEmptyTxSetMs",
+    4
+  );
+  static schema = (0,enum_value/* withMemberPrefix */.P8)(
+    (0,js_xdr/* enumType */.QT)("StellarValueType", {
+      stellarValueBasic: 0,
+      stellarValueSigned: 1,
+      stellarValueEmptyTxSet: 2,
+      stellarValueSignedMs: 3,
+      stellarValueEmptyTxSetMs: 4
+    }),
+    "stellarValue"
+  );
+  static fromValue(value) {
+    return (0,enum_value/* enumFromValue */.t4)(
+      "StellarValueType",
+      StellarValueType.schema,
+      StellarValueType,
+      value
+    );
+  }
+  static fromName(name) {
+    return (0,enum_value/* enumFromName */.$2)("StellarValueType", StellarValueType, name);
+  }
+  static fromXdrObject(wire) {
+    return StellarValueType.fromValue(wire);
+  }
+}
+
+
+//# sourceMappingURL=stellar-value-type.js.map
+
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/public-key.js + 1 modules
+var public_key = __nccwpck_require__(2959);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/signature.js
+var signature = __nccwpck_require__(3596);
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-close-value-signature.js
+
+
+
+
+
+class LedgerCloseValueSignature extends xdr_value/* XdrValue */.SD {
+  nodeId;
+  signature;
+  static schema = (0,js_xdr/* struct */.w3)(
+    "LedgerCloseValueSignature",
+    {
+      nodeId: public_key/* PublicKey */.J.schema,
+      signature: signature/* Signature */.t.schema
+    }
+  );
+  constructor(input) {
+    super();
+    this.nodeId = input.nodeId;
+    this.signature = input.signature instanceof signature/* Signature */.t ? input.signature : new signature/* Signature */.t(input.signature);
+  }
+  toXdrObject() {
+    return {
+      nodeId: this.nodeId.toXdrObject(),
+      signature: this.signature.toXdrObject()
+    };
+  }
+  static fromXdrObject(wire) {
+    return new LedgerCloseValueSignature({
+      nodeId: public_key/* PublicKey */.J.fromXdrObject(wire.nodeId),
+      signature: signature/* Signature */.t.fromXdrObject(wire.signature)
+    });
+  }
+}
+
+
+//# sourceMappingURL=ledger-close-value-signature.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/stellar-value-proposed-value.js
+
+
+
+
+
+class StellarValueProposedValue extends xdr_value/* XdrValue */.SD {
+  txSetHash;
+  previousLedgerHash;
+  previousLedgerVersion;
+  lcValueSignature;
+  static schema = (0,js_xdr/* struct */.w3)(
+    "StellarValueProposedValue",
+    {
+      txSetHash: hash/* Hash */.V.schema,
+      previousLedgerHash: hash/* Hash */.V.schema,
+      previousLedgerVersion: (0,js_xdr/* uint32 */.S8)(),
+      lcValueSignature: LedgerCloseValueSignature.schema
+    }
+  );
+  constructor(input) {
+    super();
+    this.txSetHash = input.txSetHash instanceof hash/* Hash */.V ? input.txSetHash : new hash/* Hash */.V(input.txSetHash);
+    this.previousLedgerHash = input.previousLedgerHash instanceof hash/* Hash */.V ? input.previousLedgerHash : new hash/* Hash */.V(input.previousLedgerHash);
+    this.previousLedgerVersion = input.previousLedgerVersion;
+    this.lcValueSignature = input.lcValueSignature;
+  }
+  toXdrObject() {
+    return {
+      txSetHash: this.txSetHash.toXdrObject(),
+      previousLedgerHash: this.previousLedgerHash.toXdrObject(),
+      previousLedgerVersion: this.previousLedgerVersion,
+      lcValueSignature: this.lcValueSignature.toXdrObject()
+    };
+  }
+  static fromXdrObject(wire) {
+    return new StellarValueProposedValue({
+      txSetHash: hash/* Hash */.V.fromXdrObject(wire.txSetHash),
+      previousLedgerHash: hash/* Hash */.V.fromXdrObject(wire.previousLedgerHash),
+      previousLedgerVersion: wire.previousLedgerVersion,
+      lcValueSignature: LedgerCloseValueSignature.fromXdrObject(
+        wire.lcValueSignature
+      )
+    });
+  }
+}
+
+
+//# sourceMappingURL=stellar-value-proposed-value.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/stellar-value-signed-ms-value.js
+
+
+
+
+class StellarValueSignedMsValue extends xdr_value/* XdrValue */.SD {
+  closeTimeMs;
+  lcValueSignature;
+  static schema = (0,js_xdr/* struct */.w3)(
+    "StellarValueSignedMsValue",
+    {
+      closeTimeMs: (0,js_xdr/* uint64 */.VV)(),
+      lcValueSignature: LedgerCloseValueSignature.schema
+    }
+  );
+  constructor(input) {
+    super();
+    this.closeTimeMs = input.closeTimeMs;
+    this.lcValueSignature = input.lcValueSignature;
+  }
+  toXdrObject() {
+    return {
+      closeTimeMs: this.closeTimeMs,
+      lcValueSignature: this.lcValueSignature.toXdrObject()
+    };
+  }
+  static fromXdrObject(wire) {
+    return new StellarValueSignedMsValue({
+      closeTimeMs: wire.closeTimeMs,
+      lcValueSignature: LedgerCloseValueSignature.fromXdrObject(
+        wire.lcValueSignature
+      )
+    });
+  }
+}
+
+
+//# sourceMappingURL=stellar-value-signed-ms-value.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/stellar-value-proposed-ms-value.js
+
+
+
+
+
+class StellarValueProposedMsValue extends xdr_value/* XdrValue */.SD {
+  closeTimeMs;
+  txSetHash;
+  previousLedgerHash;
+  previousLedgerVersion;
+  lcValueSignature;
+  static schema = (0,js_xdr/* struct */.w3)(
+    "StellarValueProposedMsValue",
+    {
+      closeTimeMs: (0,js_xdr/* uint64 */.VV)(),
+      txSetHash: hash/* Hash */.V.schema,
+      previousLedgerHash: hash/* Hash */.V.schema,
+      previousLedgerVersion: (0,js_xdr/* uint32 */.S8)(),
+      lcValueSignature: LedgerCloseValueSignature.schema
+    }
+  );
+  constructor(input) {
+    super();
+    this.closeTimeMs = input.closeTimeMs;
+    this.txSetHash = input.txSetHash instanceof hash/* Hash */.V ? input.txSetHash : new hash/* Hash */.V(input.txSetHash);
+    this.previousLedgerHash = input.previousLedgerHash instanceof hash/* Hash */.V ? input.previousLedgerHash : new hash/* Hash */.V(input.previousLedgerHash);
+    this.previousLedgerVersion = input.previousLedgerVersion;
+    this.lcValueSignature = input.lcValueSignature;
+  }
+  toXdrObject() {
+    return {
+      closeTimeMs: this.closeTimeMs,
+      txSetHash: this.txSetHash.toXdrObject(),
+      previousLedgerHash: this.previousLedgerHash.toXdrObject(),
+      previousLedgerVersion: this.previousLedgerVersion,
+      lcValueSignature: this.lcValueSignature.toXdrObject()
+    };
+  }
+  static fromXdrObject(wire) {
+    return new StellarValueProposedMsValue({
+      closeTimeMs: wire.closeTimeMs,
+      txSetHash: hash/* Hash */.V.fromXdrObject(wire.txSetHash),
+      previousLedgerHash: hash/* Hash */.V.fromXdrObject(wire.previousLedgerHash),
+      previousLedgerVersion: wire.previousLedgerVersion,
+      lcValueSignature: LedgerCloseValueSignature.fromXdrObject(
+        wire.lcValueSignature
+      )
+    });
+  }
+}
+
+
+//# sourceMappingURL=stellar-value-proposed-ms-value.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/stellar-value-ext.js
+
+
+
+
+
+
+
+
+class StellarValueExtBase extends xdr_value/* XdrValue */.SD {
+  constructor() {
+    super();
+    if (new.target === StellarValueExtBase) {
+      throw new TypeError(
+        "new xdr.StellarValueExt(...) is not supported: XDR unions are built from per-variant factories. Call xdr.StellarValueExt.stellarValueBasic() (or another arm factory) instead."
+      );
+    }
+  }
+  static schema = (0,js_xdr/* union */.KC)(
+    "StellarValueExt",
+    {
+      switchOn: StellarValueType.schema,
+      cases: [
+        (0,js_xdr/* case */.DH)("stellarValueBasic", 0, (0,js_xdr/* void */.rI)()),
+        (0,js_xdr/* case */.DH)(
+          "stellarValueSigned",
+          1,
+          (0,js_xdr/* field */.ZZ)("lcValueSignature", LedgerCloseValueSignature.schema)
+        ),
+        (0,js_xdr/* case */.DH)(
+          "stellarValueEmptyTxSet",
+          2,
+          (0,js_xdr/* field */.ZZ)("proposedValue", StellarValueProposedValue.schema)
+        ),
+        (0,js_xdr/* case */.DH)(
+          "stellarValueSignedMs",
+          3,
+          (0,js_xdr/* field */.ZZ)("signedMsValue", StellarValueSignedMsValue.schema)
+        ),
+        (0,js_xdr/* case */.DH)(
+          "stellarValueEmptyTxSetMs",
+          4,
+          (0,js_xdr/* field */.ZZ)("proposedMsValue", StellarValueProposedMsValue.schema)
+        )
+      ],
+      switchKey: "v"
+    }
+  );
+  static stellarValueBasic() {
+    return new StellarValueExtBasic();
+  }
+  static stellarValueSigned(lcValueSignature) {
+    return new StellarValueExtSigned(lcValueSignature);
+  }
+  static stellarValueEmptyTxSet(proposedValue) {
+    return new StellarValueExtEmptyTxSet(proposedValue);
+  }
+  static stellarValueSignedMs(signedMsValue) {
+    return new StellarValueExtSignedMs(signedMsValue);
+  }
+  static stellarValueEmptyTxSetMs(proposedMsValue) {
+    return new StellarValueExtEmptyTxSetMs(proposedMsValue);
+  }
+  static fromXdrObject(wire) {
+    switch (wire.v) {
+      case 0:
+        return new StellarValueExtBasic();
+      case 1:
+        return new StellarValueExtSigned(
+          LedgerCloseValueSignature.fromXdrObject(wire.lcValueSignature)
+        );
+      case 2:
+        return new StellarValueExtEmptyTxSet(
+          StellarValueProposedValue.fromXdrObject(wire.proposedValue)
+        );
+      case 3:
+        return new StellarValueExtSignedMs(
+          StellarValueSignedMsValue.fromXdrObject(wire.signedMsValue)
+        );
+      case 4:
+        return new StellarValueExtEmptyTxSetMs(
+          StellarValueProposedMsValue.fromXdrObject(wire.proposedMsValue)
+        );
+    }
+    throw new js_xdr/* XdrError */.zj(
+      `StellarValueExt: unknown v ${wire.v}`
+    );
+  }
+  /**
+   * Type guard narrowing an unknown value to a concrete StellarValueExt variant.
+   * Use this instead of `instanceof StellarValueExt`: the exported `StellarValueExt` value
+   * is the abstract base, so `instanceof` narrows to the base (not the
+   * variant union) and forces a cast. `StellarValueExt.is(x)` narrows to the union.
+   */
+  static is(value) {
+    return value instanceof StellarValueExtBase;
+  }
+}
+class StellarValueExtBasic extends StellarValueExtBase {
+  type = "stellarValueBasic";
+  get value() {
+    return null;
+  }
+  toXdrObject() {
+    return { v: 0 };
+  }
+}
+class StellarValueExtSigned extends StellarValueExtBase {
+  type = "stellarValueSigned";
+  lcValueSignature;
+  constructor(lcValueSignature) {
+    super();
+    this.lcValueSignature = lcValueSignature;
+  }
+  get value() {
+    return this.lcValueSignature;
+  }
+  toXdrObject() {
+    return { v: 1, lcValueSignature: this.lcValueSignature.toXdrObject() };
+  }
+}
+class StellarValueExtEmptyTxSet extends StellarValueExtBase {
+  type = "stellarValueEmptyTxSet";
+  proposedValue;
+  constructor(proposedValue) {
+    super();
+    this.proposedValue = proposedValue;
+  }
+  get value() {
+    return this.proposedValue;
+  }
+  toXdrObject() {
+    return { v: 2, proposedValue: this.proposedValue.toXdrObject() };
+  }
+}
+class StellarValueExtSignedMs extends StellarValueExtBase {
+  type = "stellarValueSignedMs";
+  signedMsValue;
+  constructor(signedMsValue) {
+    super();
+    this.signedMsValue = signedMsValue;
+  }
+  get value() {
+    return this.signedMsValue;
+  }
+  toXdrObject() {
+    return { v: 3, signedMsValue: this.signedMsValue.toXdrObject() };
+  }
+}
+class StellarValueExtEmptyTxSetMs extends StellarValueExtBase {
+  type = "stellarValueEmptyTxSetMs";
+  proposedMsValue;
+  constructor(proposedMsValue) {
+    super();
+    this.proposedMsValue = proposedMsValue;
+  }
+  get value() {
+    return this.proposedMsValue;
+  }
+  toXdrObject() {
+    return { v: 4, proposedMsValue: this.proposedMsValue.toXdrObject() };
+  }
+}
+const StellarValueExt = StellarValueExtBase;
+
+
+//# sourceMappingURL=stellar-value-ext.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/stellar-value.js
+
+
+
+
+
+
+class StellarValue extends xdr_value/* XdrValue */.SD {
+  txSetHash;
+  closeTime;
+  upgrades;
+  ext;
+  static schema = (0,js_xdr/* struct */.w3)("StellarValue", {
+    txSetHash: hash/* Hash */.V.schema,
+    closeTime: (0,js_xdr/* uint64 */.VV)(),
+    upgrades: (0,js_xdr/* array */.YO)(UpgradeType.schema, 6),
+    ext: StellarValueExt.schema
+  });
+  constructor(input) {
+    super();
+    this.txSetHash = input.txSetHash instanceof hash/* Hash */.V ? input.txSetHash : new hash/* Hash */.V(input.txSetHash);
+    this.closeTime = input.closeTime;
+    this.upgrades = input.upgrades.map(
+      (v) => v instanceof UpgradeType ? v : new UpgradeType(v)
+    );
+    this.ext = input.ext;
+  }
+  toXdrObject() {
+    return {
+      txSetHash: this.txSetHash.toXdrObject(),
+      closeTime: this.closeTime,
+      upgrades: this.upgrades.map((v) => v.toXdrObject()),
+      ext: this.ext.toXdrObject()
+    };
+  }
+  static fromXdrObject(wire) {
+    return new StellarValue({
+      txSetHash: hash/* Hash */.V.fromXdrObject(wire.txSetHash),
+      closeTime: wire.closeTime,
+      upgrades: wire.upgrades.map((w) => UpgradeType.fromXdrObject(w)),
+      ext: StellarValueExt.fromXdrObject(wire.ext)
+    });
+  }
+}
+
+
+//# sourceMappingURL=stellar-value.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header-extension-v1-ext.js
+
+
+
+class LedgerHeaderExtensionV1ExtBase extends xdr_value/* XdrValue */.SD {
+  constructor() {
+    super();
+    if (new.target === LedgerHeaderExtensionV1ExtBase) {
+      throw new TypeError(
+        "new xdr.LedgerHeaderExtensionV1Ext(...) is not supported: XDR unions are built from per-variant factories. Call xdr.LedgerHeaderExtensionV1Ext.v0() (or another arm factory) instead."
+      );
+    }
+  }
+  static schema = (0,js_xdr/* union */.KC)(
+    "LedgerHeaderExtensionV1Ext",
+    {
+      switchOn: (0,js_xdr/* int32 */.HA)(),
+      cases: [(0,js_xdr/* case */.DH)("v0", 0, (0,js_xdr/* void */.rI)())],
+      switchKey: "v"
+    }
+  );
+  static v0() {
+    return new LedgerHeaderExtensionV1ExtV0();
+  }
+  static fromXdrObject(wire) {
+    switch (wire.v) {
+      case 0:
+        return new LedgerHeaderExtensionV1ExtV0();
+    }
+    throw new js_xdr/* XdrError */.zj(
+      `LedgerHeaderExtensionV1Ext: unknown v ${wire.v}`
+    );
+  }
+  /**
+   * Type guard narrowing an unknown value to a concrete LedgerHeaderExtensionV1Ext variant.
+   * Use this instead of `instanceof LedgerHeaderExtensionV1Ext`: the exported `LedgerHeaderExtensionV1Ext` value
+   * is the abstract base, so `instanceof` narrows to the base (not the
+   * variant union) and forces a cast. `LedgerHeaderExtensionV1Ext.is(x)` narrows to the union.
+   */
+  static is(value) {
+    return value instanceof LedgerHeaderExtensionV1ExtBase;
+  }
+}
+class LedgerHeaderExtensionV1ExtV0 extends LedgerHeaderExtensionV1ExtBase {
+  type = "v0";
+  get value() {
+    return null;
+  }
+  toXdrObject() {
+    return { v: 0 };
+  }
+}
+const LedgerHeaderExtensionV1Ext = LedgerHeaderExtensionV1ExtBase;
+
+
+//# sourceMappingURL=ledger-header-extension-v1-ext.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header-extension-v1.js
+
+
+
+
+class LedgerHeaderExtensionV1 extends xdr_value/* XdrValue */.SD {
+  flags;
+  ext;
+  static schema = (0,js_xdr/* struct */.w3)(
+    "LedgerHeaderExtensionV1",
+    {
+      flags: (0,js_xdr/* uint32 */.S8)(),
+      ext: LedgerHeaderExtensionV1Ext.schema
+    }
+  );
+  constructor(input) {
+    super();
+    this.flags = input.flags;
+    this.ext = input.ext;
+  }
+  toXdrObject() {
+    return {
+      flags: this.flags,
+      ext: this.ext.toXdrObject()
+    };
+  }
+  static fromXdrObject(wire) {
+    return new LedgerHeaderExtensionV1({
+      flags: wire.flags,
+      ext: LedgerHeaderExtensionV1Ext.fromXdrObject(wire.ext)
+    });
+  }
+}
+
+
+//# sourceMappingURL=ledger-header-extension-v1.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header-ext.js
+
+
+
+
+class LedgerHeaderExtBase extends xdr_value/* XdrValue */.SD {
+  constructor() {
+    super();
+    if (new.target === LedgerHeaderExtBase) {
+      throw new TypeError(
+        "new xdr.LedgerHeaderExt(...) is not supported: XDR unions are built from per-variant factories. Call xdr.LedgerHeaderExt.v0() (or another arm factory) instead."
+      );
+    }
+  }
+  static schema = (0,js_xdr/* union */.KC)(
+    "LedgerHeaderExt",
+    {
+      switchOn: (0,js_xdr/* int32 */.HA)(),
+      cases: [
+        (0,js_xdr/* case */.DH)("v0", 0, (0,js_xdr/* void */.rI)()),
+        (0,js_xdr/* case */.DH)("v1", 1, (0,js_xdr/* field */.ZZ)("v1", LedgerHeaderExtensionV1.schema))
+      ],
+      switchKey: "v"
+    }
+  );
+  static v0() {
+    return new LedgerHeaderExtV0();
+  }
+  static v1(v1) {
+    return new LedgerHeaderExtV1(v1);
+  }
+  static fromXdrObject(wire) {
+    switch (wire.v) {
+      case 0:
+        return new LedgerHeaderExtV0();
+      case 1:
+        return new LedgerHeaderExtV1(
+          LedgerHeaderExtensionV1.fromXdrObject(wire.v1)
+        );
+    }
+    throw new js_xdr/* XdrError */.zj(
+      `LedgerHeaderExt: unknown v ${wire.v}`
+    );
+  }
+  /**
+   * Type guard narrowing an unknown value to a concrete LedgerHeaderExt variant.
+   * Use this instead of `instanceof LedgerHeaderExt`: the exported `LedgerHeaderExt` value
+   * is the abstract base, so `instanceof` narrows to the base (not the
+   * variant union) and forces a cast. `LedgerHeaderExt.is(x)` narrows to the union.
+   */
+  static is(value) {
+    return value instanceof LedgerHeaderExtBase;
+  }
+}
+class LedgerHeaderExtV0 extends LedgerHeaderExtBase {
+  type = "v0";
+  get value() {
+    return null;
+  }
+  toXdrObject() {
+    return { v: 0 };
+  }
+}
+class LedgerHeaderExtV1 extends LedgerHeaderExtBase {
+  type = "v1";
+  v1;
+  constructor(v1) {
+    super();
+    this.v1 = v1;
+  }
+  get value() {
+    return this.v1;
+  }
+  toXdrObject() {
+    return { v: 1, v1: this.v1.toXdrObject() };
+  }
+}
+const LedgerHeaderExt = LedgerHeaderExtBase;
+
+
+//# sourceMappingURL=ledger-header-ext.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header.js
+
+
+
+
+
+
+class LedgerHeader extends xdr_value/* XdrValue */.SD {
+  ledgerVersion;
+  previousLedgerHash;
+  scpValue;
+  txSetResultHash;
+  bucketListHash;
+  ledgerSeq;
+  totalCoins;
+  feePool;
+  inflationSeq;
+  idPool;
+  baseFee;
+  baseReserve;
+  maxTxSetSize;
+  skipList;
+  ext;
+  static schema = (0,js_xdr/* struct */.w3)("LedgerHeader", {
+    ledgerVersion: (0,js_xdr/* uint32 */.S8)(),
+    previousLedgerHash: hash/* Hash */.V.schema,
+    scpValue: StellarValue.schema,
+    txSetResultHash: hash/* Hash */.V.schema,
+    bucketListHash: hash/* Hash */.V.schema,
+    ledgerSeq: (0,js_xdr/* uint32 */.S8)(),
+    totalCoins: (0,js_xdr/* int64 */.Gk)(),
+    feePool: (0,js_xdr/* int64 */.Gk)(),
+    inflationSeq: (0,js_xdr/* uint32 */.S8)(),
+    idPool: (0,js_xdr/* uint64 */.VV)(),
+    baseFee: (0,js_xdr/* uint32 */.S8)(),
+    baseReserve: (0,js_xdr/* uint32 */.S8)(),
+    maxTxSetSize: (0,js_xdr/* uint32 */.S8)(),
+    skipList: (0,js_xdr/* fixedArray */.KB)(hash/* Hash */.V.schema, 4),
+    ext: LedgerHeaderExt.schema
+  });
+  constructor(input) {
+    super();
+    this.ledgerVersion = input.ledgerVersion;
+    this.previousLedgerHash = input.previousLedgerHash instanceof hash/* Hash */.V ? input.previousLedgerHash : new hash/* Hash */.V(input.previousLedgerHash);
+    this.scpValue = input.scpValue;
+    this.txSetResultHash = input.txSetResultHash instanceof hash/* Hash */.V ? input.txSetResultHash : new hash/* Hash */.V(input.txSetResultHash);
+    this.bucketListHash = input.bucketListHash instanceof hash/* Hash */.V ? input.bucketListHash : new hash/* Hash */.V(input.bucketListHash);
+    this.ledgerSeq = input.ledgerSeq;
+    this.totalCoins = input.totalCoins;
+    this.feePool = input.feePool;
+    this.inflationSeq = input.inflationSeq;
+    this.idPool = input.idPool;
+    this.baseFee = input.baseFee;
+    this.baseReserve = input.baseReserve;
+    this.maxTxSetSize = input.maxTxSetSize;
+    this.skipList = input.skipList.map(
+      (v) => v instanceof hash/* Hash */.V ? v : new hash/* Hash */.V(v)
+    );
+    this.ext = input.ext;
+  }
+  toXdrObject() {
+    return {
+      ledgerVersion: this.ledgerVersion,
+      previousLedgerHash: this.previousLedgerHash.toXdrObject(),
+      scpValue: this.scpValue.toXdrObject(),
+      txSetResultHash: this.txSetResultHash.toXdrObject(),
+      bucketListHash: this.bucketListHash.toXdrObject(),
+      ledgerSeq: this.ledgerSeq,
+      totalCoins: this.totalCoins,
+      feePool: this.feePool,
+      inflationSeq: this.inflationSeq,
+      idPool: this.idPool,
+      baseFee: this.baseFee,
+      baseReserve: this.baseReserve,
+      maxTxSetSize: this.maxTxSetSize,
+      skipList: this.skipList.map((v) => v.toXdrObject()),
+      ext: this.ext.toXdrObject()
+    };
+  }
+  static fromXdrObject(wire) {
+    return new LedgerHeader({
+      ledgerVersion: wire.ledgerVersion,
+      previousLedgerHash: hash/* Hash */.V.fromXdrObject(wire.previousLedgerHash),
+      scpValue: StellarValue.fromXdrObject(wire.scpValue),
+      txSetResultHash: hash/* Hash */.V.fromXdrObject(wire.txSetResultHash),
+      bucketListHash: hash/* Hash */.V.fromXdrObject(wire.bucketListHash),
+      ledgerSeq: wire.ledgerSeq,
+      totalCoins: wire.totalCoins,
+      feePool: wire.feePool,
+      inflationSeq: wire.inflationSeq,
+      idPool: wire.idPool,
+      baseFee: wire.baseFee,
+      baseReserve: wire.baseReserve,
+      maxTxSetSize: wire.maxTxSetSize,
+      skipList: wire.skipList.map((w) => hash/* Hash */.V.fromXdrObject(w)),
+      ext: LedgerHeaderExt.fromXdrObject(wire.ext)
+    });
+  }
+}
+
+
+//# sourceMappingURL=ledger-header.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header-history-entry-ext.js
+
+
+
+class LedgerHeaderHistoryEntryExtBase extends xdr_value/* XdrValue */.SD {
+  constructor() {
+    super();
+    if (new.target === LedgerHeaderHistoryEntryExtBase) {
+      throw new TypeError(
+        "new xdr.LedgerHeaderHistoryEntryExt(...) is not supported: XDR unions are built from per-variant factories. Call xdr.LedgerHeaderHistoryEntryExt.v0() (or another arm factory) instead."
+      );
+    }
+  }
+  static schema = (0,js_xdr/* union */.KC)(
+    "LedgerHeaderHistoryEntryExt",
+    {
+      switchOn: (0,js_xdr/* int32 */.HA)(),
+      cases: [(0,js_xdr/* case */.DH)("v0", 0, (0,js_xdr/* void */.rI)())],
+      switchKey: "v"
+    }
+  );
+  static v0() {
+    return new LedgerHeaderHistoryEntryExtV0();
+  }
+  static fromXdrObject(wire) {
+    switch (wire.v) {
+      case 0:
+        return new LedgerHeaderHistoryEntryExtV0();
+    }
+    throw new js_xdr/* XdrError */.zj(
+      `LedgerHeaderHistoryEntryExt: unknown v ${wire.v}`
+    );
+  }
+  /**
+   * Type guard narrowing an unknown value to a concrete LedgerHeaderHistoryEntryExt variant.
+   * Use this instead of `instanceof LedgerHeaderHistoryEntryExt`: the exported `LedgerHeaderHistoryEntryExt` value
+   * is the abstract base, so `instanceof` narrows to the base (not the
+   * variant union) and forces a cast. `LedgerHeaderHistoryEntryExt.is(x)` narrows to the union.
+   */
+  static is(value) {
+    return value instanceof LedgerHeaderHistoryEntryExtBase;
+  }
+}
+class LedgerHeaderHistoryEntryExtV0 extends LedgerHeaderHistoryEntryExtBase {
+  type = "v0";
+  get value() {
+    return null;
+  }
+  toXdrObject() {
+    return { v: 0 };
+  }
+}
+const LedgerHeaderHistoryEntryExt = LedgerHeaderHistoryEntryExtBase;
+
+
+//# sourceMappingURL=ledger-header-history-entry-ext.js.map
+
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header-history-entry.js
+
+
+
+
+
+
+class LedgerHeaderHistoryEntry extends xdr_value/* XdrValue */.SD {
+  hash;
+  header;
+  ext;
+  static schema = (0,js_xdr/* struct */.w3)(
+    "LedgerHeaderHistoryEntry",
+    {
+      hash: hash/* Hash */.V.schema,
+      header: LedgerHeader.schema,
+      ext: LedgerHeaderHistoryEntryExt.schema
+    }
+  );
+  constructor(input) {
+    super();
+    this.hash = input.hash instanceof hash/* Hash */.V ? input.hash : new hash/* Hash */.V(input.hash);
+    this.header = input.header;
+    this.ext = input.ext;
+  }
+  toXdrObject() {
+    return {
+      hash: this.hash.toXdrObject(),
+      header: this.header.toXdrObject(),
+      ext: this.ext.toXdrObject()
+    };
+  }
+  static fromXdrObject(wire) {
+    return new LedgerHeaderHistoryEntry({
+      hash: hash/* Hash */.V.fromXdrObject(wire.hash),
+      header: LedgerHeader.fromXdrObject(wire.header),
+      ext: LedgerHeaderHistoryEntryExt.fromXdrObject(wire.ext)
+    });
+  }
+}
+
+
+//# sourceMappingURL=ledger-header-history-entry.js.map
+
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/transaction-envelope.js
+var transaction_envelope = __nccwpck_require__(9675);
+;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/transaction-set.js
+
+
+
+
+
+class TransactionSet extends xdr_value/* XdrValue */.SD {
+  previousLedgerHash;
+  txs;
+  static schema = (0,js_xdr/* struct */.w3)(
+    "TransactionSet",
+    {
+      previousLedgerHash: hash/* Hash */.V.schema,
+      txs: (0,js_xdr/* array */.YO)(transaction_envelope/* TransactionEnvelope */.BB.schema, js_xdr/* UNBOUNDED_MAX_LENGTH */.dp)
+    }
+  );
+  constructor(input) {
+    super();
+    this.previousLedgerHash = input.previousLedgerHash instanceof hash/* Hash */.V ? input.previousLedgerHash : new hash/* Hash */.V(input.previousLedgerHash);
+    this.txs = input.txs;
+  }
+  toXdrObject() {
+    return {
+      previousLedgerHash: this.previousLedgerHash.toXdrObject(),
+      txs: this.txs.map((v) => v.toXdrObject())
+    };
+  }
+  static fromXdrObject(wire) {
+    return new TransactionSet({
+      previousLedgerHash: hash/* Hash */.V.fromXdrObject(wire.previousLedgerHash),
+      txs: wire.txs.map((w) => transaction_envelope/* TransactionEnvelope */.BB.fromXdrObject(w))
+    });
+  }
+}
+
+
+//# sourceMappingURL=transaction-set.js.map
+
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/transaction-result-code.js
 
 
@@ -52830,8 +54061,6 @@ class TransactionResultCode extends enum_value/* EnumValue */.RS {
 
 //# sourceMappingURL=transaction-result-code.js.map
 
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/hash.js
-var hash = __nccwpck_require__(4448);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/operation-result-code.js
 
 
@@ -53530,8 +54759,6 @@ class ClaimOfferAtomV0 extends xdr_value/* XdrValue */.SD {
 
 //# sourceMappingURL=claim-offer-atom-v0.js.map
 
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/public-key.js + 1 modules
-var public_key = __nccwpck_require__(2959);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/claim-offer-atom.js
 
 
@@ -61159,739 +62386,6 @@ class TransactionResult extends xdr_value/* XdrValue */.SD {
 
 //# sourceMappingURL=transaction-result.js.map
 
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/bytes-value.js
-var bytes_value = __nccwpck_require__(5632);
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/upgrade-type.js
-
-
-
-class UpgradeType extends bytes_value/* BytesValue */.v {
-  static encoding = "hex";
-  static schema = (0,js_xdr/* varOpaque */.bj)(128, "UpgradeType");
-  static fromXdrObject(wire) {
-    return new UpgradeType(wire);
-  }
-}
-
-
-//# sourceMappingURL=upgrade-type.js.map
-
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/stellar-value-type.js
-
-
-
-class StellarValueType extends enum_value/* EnumValue */.RS {
-  static stellarValueBasic = new StellarValueType(
-    "stellarValueBasic",
-    0
-  );
-  static stellarValueSigned = new StellarValueType(
-    "stellarValueSigned",
-    1
-  );
-  static stellarValueEmptyTxSet = new StellarValueType(
-    "stellarValueEmptyTxSet",
-    2
-  );
-  static schema = (0,enum_value/* withMemberPrefix */.P8)(
-    (0,js_xdr/* enumType */.QT)("StellarValueType", {
-      stellarValueBasic: 0,
-      stellarValueSigned: 1,
-      stellarValueEmptyTxSet: 2
-    }),
-    "stellarValue"
-  );
-  static fromValue(value) {
-    return (0,enum_value/* enumFromValue */.t4)(
-      "StellarValueType",
-      StellarValueType.schema,
-      StellarValueType,
-      value
-    );
-  }
-  static fromName(name) {
-    return (0,enum_value/* enumFromName */.$2)("StellarValueType", StellarValueType, name);
-  }
-  static fromXdrObject(wire) {
-    return StellarValueType.fromValue(wire);
-  }
-}
-
-
-//# sourceMappingURL=stellar-value-type.js.map
-
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/signature.js
-var signature = __nccwpck_require__(3596);
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-close-value-signature.js
-
-
-
-
-
-class LedgerCloseValueSignature extends xdr_value/* XdrValue */.SD {
-  nodeId;
-  signature;
-  static schema = (0,js_xdr/* struct */.w3)(
-    "LedgerCloseValueSignature",
-    {
-      nodeId: public_key/* PublicKey */.J.schema,
-      signature: signature/* Signature */.t.schema
-    }
-  );
-  constructor(input) {
-    super();
-    this.nodeId = input.nodeId;
-    this.signature = input.signature instanceof signature/* Signature */.t ? input.signature : new signature/* Signature */.t(input.signature);
-  }
-  toXdrObject() {
-    return {
-      nodeId: this.nodeId.toXdrObject(),
-      signature: this.signature.toXdrObject()
-    };
-  }
-  static fromXdrObject(wire) {
-    return new LedgerCloseValueSignature({
-      nodeId: public_key/* PublicKey */.J.fromXdrObject(wire.nodeId),
-      signature: signature/* Signature */.t.fromXdrObject(wire.signature)
-    });
-  }
-}
-
-
-//# sourceMappingURL=ledger-close-value-signature.js.map
-
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/stellar-value-proposed-value.js
-
-
-
-
-
-class StellarValueProposedValue extends xdr_value/* XdrValue */.SD {
-  txSetHash;
-  previousLedgerHash;
-  previousLedgerVersion;
-  lcValueSignature;
-  static schema = (0,js_xdr/* struct */.w3)(
-    "StellarValueProposedValue",
-    {
-      txSetHash: hash/* Hash */.V.schema,
-      previousLedgerHash: hash/* Hash */.V.schema,
-      previousLedgerVersion: (0,js_xdr/* uint32 */.S8)(),
-      lcValueSignature: LedgerCloseValueSignature.schema
-    }
-  );
-  constructor(input) {
-    super();
-    this.txSetHash = input.txSetHash instanceof hash/* Hash */.V ? input.txSetHash : new hash/* Hash */.V(input.txSetHash);
-    this.previousLedgerHash = input.previousLedgerHash instanceof hash/* Hash */.V ? input.previousLedgerHash : new hash/* Hash */.V(input.previousLedgerHash);
-    this.previousLedgerVersion = input.previousLedgerVersion;
-    this.lcValueSignature = input.lcValueSignature;
-  }
-  toXdrObject() {
-    return {
-      txSetHash: this.txSetHash.toXdrObject(),
-      previousLedgerHash: this.previousLedgerHash.toXdrObject(),
-      previousLedgerVersion: this.previousLedgerVersion,
-      lcValueSignature: this.lcValueSignature.toXdrObject()
-    };
-  }
-  static fromXdrObject(wire) {
-    return new StellarValueProposedValue({
-      txSetHash: hash/* Hash */.V.fromXdrObject(wire.txSetHash),
-      previousLedgerHash: hash/* Hash */.V.fromXdrObject(wire.previousLedgerHash),
-      previousLedgerVersion: wire.previousLedgerVersion,
-      lcValueSignature: LedgerCloseValueSignature.fromXdrObject(
-        wire.lcValueSignature
-      )
-    });
-  }
-}
-
-
-//# sourceMappingURL=stellar-value-proposed-value.js.map
-
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/stellar-value-ext.js
-
-
-
-
-
-
-class StellarValueExtBase extends xdr_value/* XdrValue */.SD {
-  constructor() {
-    super();
-    if (new.target === StellarValueExtBase) {
-      throw new TypeError(
-        "new xdr.StellarValueExt(...) is not supported: XDR unions are built from per-variant factories. Call xdr.StellarValueExt.stellarValueBasic() (or another arm factory) instead."
-      );
-    }
-  }
-  static schema = (0,js_xdr/* union */.KC)(
-    "StellarValueExt",
-    {
-      switchOn: StellarValueType.schema,
-      cases: [
-        (0,js_xdr/* case */.DH)("stellarValueBasic", 0, (0,js_xdr/* void */.rI)()),
-        (0,js_xdr/* case */.DH)(
-          "stellarValueSigned",
-          1,
-          (0,js_xdr/* field */.ZZ)("lcValueSignature", LedgerCloseValueSignature.schema)
-        ),
-        (0,js_xdr/* case */.DH)(
-          "stellarValueEmptyTxSet",
-          2,
-          (0,js_xdr/* field */.ZZ)("proposedValue", StellarValueProposedValue.schema)
-        )
-      ],
-      switchKey: "v"
-    }
-  );
-  static stellarValueBasic() {
-    return new StellarValueExtBasic();
-  }
-  static stellarValueSigned(lcValueSignature) {
-    return new StellarValueExtSigned(lcValueSignature);
-  }
-  static stellarValueEmptyTxSet(proposedValue) {
-    return new StellarValueExtEmptyTxSet(proposedValue);
-  }
-  static fromXdrObject(wire) {
-    switch (wire.v) {
-      case 0:
-        return new StellarValueExtBasic();
-      case 1:
-        return new StellarValueExtSigned(
-          LedgerCloseValueSignature.fromXdrObject(wire.lcValueSignature)
-        );
-      case 2:
-        return new StellarValueExtEmptyTxSet(
-          StellarValueProposedValue.fromXdrObject(wire.proposedValue)
-        );
-    }
-    throw new js_xdr/* XdrError */.zj(
-      `StellarValueExt: unknown v ${wire.v}`
-    );
-  }
-  /**
-   * Type guard narrowing an unknown value to a concrete StellarValueExt variant.
-   * Use this instead of `instanceof StellarValueExt`: the exported `StellarValueExt` value
-   * is the abstract base, so `instanceof` narrows to the base (not the
-   * variant union) and forces a cast. `StellarValueExt.is(x)` narrows to the union.
-   */
-  static is(value) {
-    return value instanceof StellarValueExtBase;
-  }
-}
-class StellarValueExtBasic extends StellarValueExtBase {
-  type = "stellarValueBasic";
-  get value() {
-    return null;
-  }
-  toXdrObject() {
-    return { v: 0 };
-  }
-}
-class StellarValueExtSigned extends StellarValueExtBase {
-  type = "stellarValueSigned";
-  lcValueSignature;
-  constructor(lcValueSignature) {
-    super();
-    this.lcValueSignature = lcValueSignature;
-  }
-  get value() {
-    return this.lcValueSignature;
-  }
-  toXdrObject() {
-    return { v: 1, lcValueSignature: this.lcValueSignature.toXdrObject() };
-  }
-}
-class StellarValueExtEmptyTxSet extends StellarValueExtBase {
-  type = "stellarValueEmptyTxSet";
-  proposedValue;
-  constructor(proposedValue) {
-    super();
-    this.proposedValue = proposedValue;
-  }
-  get value() {
-    return this.proposedValue;
-  }
-  toXdrObject() {
-    return { v: 2, proposedValue: this.proposedValue.toXdrObject() };
-  }
-}
-const StellarValueExt = StellarValueExtBase;
-
-
-//# sourceMappingURL=stellar-value-ext.js.map
-
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/stellar-value.js
-
-
-
-
-
-
-class StellarValue extends xdr_value/* XdrValue */.SD {
-  txSetHash;
-  closeTime;
-  upgrades;
-  ext;
-  static schema = (0,js_xdr/* struct */.w3)("StellarValue", {
-    txSetHash: hash/* Hash */.V.schema,
-    closeTime: (0,js_xdr/* uint64 */.VV)(),
-    upgrades: (0,js_xdr/* array */.YO)(UpgradeType.schema, 6),
-    ext: StellarValueExt.schema
-  });
-  constructor(input) {
-    super();
-    this.txSetHash = input.txSetHash instanceof hash/* Hash */.V ? input.txSetHash : new hash/* Hash */.V(input.txSetHash);
-    this.closeTime = input.closeTime;
-    this.upgrades = input.upgrades.map(
-      (v) => v instanceof UpgradeType ? v : new UpgradeType(v)
-    );
-    this.ext = input.ext;
-  }
-  toXdrObject() {
-    return {
-      txSetHash: this.txSetHash.toXdrObject(),
-      closeTime: this.closeTime,
-      upgrades: this.upgrades.map((v) => v.toXdrObject()),
-      ext: this.ext.toXdrObject()
-    };
-  }
-  static fromXdrObject(wire) {
-    return new StellarValue({
-      txSetHash: hash/* Hash */.V.fromXdrObject(wire.txSetHash),
-      closeTime: wire.closeTime,
-      upgrades: wire.upgrades.map((w) => UpgradeType.fromXdrObject(w)),
-      ext: StellarValueExt.fromXdrObject(wire.ext)
-    });
-  }
-}
-
-
-//# sourceMappingURL=stellar-value.js.map
-
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header-extension-v1-ext.js
-
-
-
-class LedgerHeaderExtensionV1ExtBase extends xdr_value/* XdrValue */.SD {
-  constructor() {
-    super();
-    if (new.target === LedgerHeaderExtensionV1ExtBase) {
-      throw new TypeError(
-        "new xdr.LedgerHeaderExtensionV1Ext(...) is not supported: XDR unions are built from per-variant factories. Call xdr.LedgerHeaderExtensionV1Ext.v0() (or another arm factory) instead."
-      );
-    }
-  }
-  static schema = (0,js_xdr/* union */.KC)(
-    "LedgerHeaderExtensionV1Ext",
-    {
-      switchOn: (0,js_xdr/* int32 */.HA)(),
-      cases: [(0,js_xdr/* case */.DH)("v0", 0, (0,js_xdr/* void */.rI)())],
-      switchKey: "v"
-    }
-  );
-  static v0() {
-    return new LedgerHeaderExtensionV1ExtV0();
-  }
-  static fromXdrObject(wire) {
-    switch (wire.v) {
-      case 0:
-        return new LedgerHeaderExtensionV1ExtV0();
-    }
-    throw new js_xdr/* XdrError */.zj(
-      `LedgerHeaderExtensionV1Ext: unknown v ${wire.v}`
-    );
-  }
-  /**
-   * Type guard narrowing an unknown value to a concrete LedgerHeaderExtensionV1Ext variant.
-   * Use this instead of `instanceof LedgerHeaderExtensionV1Ext`: the exported `LedgerHeaderExtensionV1Ext` value
-   * is the abstract base, so `instanceof` narrows to the base (not the
-   * variant union) and forces a cast. `LedgerHeaderExtensionV1Ext.is(x)` narrows to the union.
-   */
-  static is(value) {
-    return value instanceof LedgerHeaderExtensionV1ExtBase;
-  }
-}
-class LedgerHeaderExtensionV1ExtV0 extends LedgerHeaderExtensionV1ExtBase {
-  type = "v0";
-  get value() {
-    return null;
-  }
-  toXdrObject() {
-    return { v: 0 };
-  }
-}
-const LedgerHeaderExtensionV1Ext = LedgerHeaderExtensionV1ExtBase;
-
-
-//# sourceMappingURL=ledger-header-extension-v1-ext.js.map
-
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header-extension-v1.js
-
-
-
-
-class LedgerHeaderExtensionV1 extends xdr_value/* XdrValue */.SD {
-  flags;
-  ext;
-  static schema = (0,js_xdr/* struct */.w3)(
-    "LedgerHeaderExtensionV1",
-    {
-      flags: (0,js_xdr/* uint32 */.S8)(),
-      ext: LedgerHeaderExtensionV1Ext.schema
-    }
-  );
-  constructor(input) {
-    super();
-    this.flags = input.flags;
-    this.ext = input.ext;
-  }
-  toXdrObject() {
-    return {
-      flags: this.flags,
-      ext: this.ext.toXdrObject()
-    };
-  }
-  static fromXdrObject(wire) {
-    return new LedgerHeaderExtensionV1({
-      flags: wire.flags,
-      ext: LedgerHeaderExtensionV1Ext.fromXdrObject(wire.ext)
-    });
-  }
-}
-
-
-//# sourceMappingURL=ledger-header-extension-v1.js.map
-
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header-ext.js
-
-
-
-
-class LedgerHeaderExtBase extends xdr_value/* XdrValue */.SD {
-  constructor() {
-    super();
-    if (new.target === LedgerHeaderExtBase) {
-      throw new TypeError(
-        "new xdr.LedgerHeaderExt(...) is not supported: XDR unions are built from per-variant factories. Call xdr.LedgerHeaderExt.v0() (or another arm factory) instead."
-      );
-    }
-  }
-  static schema = (0,js_xdr/* union */.KC)(
-    "LedgerHeaderExt",
-    {
-      switchOn: (0,js_xdr/* int32 */.HA)(),
-      cases: [
-        (0,js_xdr/* case */.DH)("v0", 0, (0,js_xdr/* void */.rI)()),
-        (0,js_xdr/* case */.DH)("v1", 1, (0,js_xdr/* field */.ZZ)("v1", LedgerHeaderExtensionV1.schema))
-      ],
-      switchKey: "v"
-    }
-  );
-  static v0() {
-    return new LedgerHeaderExtV0();
-  }
-  static v1(v1) {
-    return new LedgerHeaderExtV1(v1);
-  }
-  static fromXdrObject(wire) {
-    switch (wire.v) {
-      case 0:
-        return new LedgerHeaderExtV0();
-      case 1:
-        return new LedgerHeaderExtV1(
-          LedgerHeaderExtensionV1.fromXdrObject(wire.v1)
-        );
-    }
-    throw new js_xdr/* XdrError */.zj(
-      `LedgerHeaderExt: unknown v ${wire.v}`
-    );
-  }
-  /**
-   * Type guard narrowing an unknown value to a concrete LedgerHeaderExt variant.
-   * Use this instead of `instanceof LedgerHeaderExt`: the exported `LedgerHeaderExt` value
-   * is the abstract base, so `instanceof` narrows to the base (not the
-   * variant union) and forces a cast. `LedgerHeaderExt.is(x)` narrows to the union.
-   */
-  static is(value) {
-    return value instanceof LedgerHeaderExtBase;
-  }
-}
-class LedgerHeaderExtV0 extends LedgerHeaderExtBase {
-  type = "v0";
-  get value() {
-    return null;
-  }
-  toXdrObject() {
-    return { v: 0 };
-  }
-}
-class LedgerHeaderExtV1 extends LedgerHeaderExtBase {
-  type = "v1";
-  v1;
-  constructor(v1) {
-    super();
-    this.v1 = v1;
-  }
-  get value() {
-    return this.v1;
-  }
-  toXdrObject() {
-    return { v: 1, v1: this.v1.toXdrObject() };
-  }
-}
-const LedgerHeaderExt = LedgerHeaderExtBase;
-
-
-//# sourceMappingURL=ledger-header-ext.js.map
-
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header.js
-
-
-
-
-
-
-class LedgerHeader extends xdr_value/* XdrValue */.SD {
-  ledgerVersion;
-  previousLedgerHash;
-  scpValue;
-  txSetResultHash;
-  bucketListHash;
-  ledgerSeq;
-  totalCoins;
-  feePool;
-  inflationSeq;
-  idPool;
-  baseFee;
-  baseReserve;
-  maxTxSetSize;
-  skipList;
-  ext;
-  static schema = (0,js_xdr/* struct */.w3)("LedgerHeader", {
-    ledgerVersion: (0,js_xdr/* uint32 */.S8)(),
-    previousLedgerHash: hash/* Hash */.V.schema,
-    scpValue: StellarValue.schema,
-    txSetResultHash: hash/* Hash */.V.schema,
-    bucketListHash: hash/* Hash */.V.schema,
-    ledgerSeq: (0,js_xdr/* uint32 */.S8)(),
-    totalCoins: (0,js_xdr/* int64 */.Gk)(),
-    feePool: (0,js_xdr/* int64 */.Gk)(),
-    inflationSeq: (0,js_xdr/* uint32 */.S8)(),
-    idPool: (0,js_xdr/* uint64 */.VV)(),
-    baseFee: (0,js_xdr/* uint32 */.S8)(),
-    baseReserve: (0,js_xdr/* uint32 */.S8)(),
-    maxTxSetSize: (0,js_xdr/* uint32 */.S8)(),
-    skipList: (0,js_xdr/* fixedArray */.KB)(hash/* Hash */.V.schema, 4),
-    ext: LedgerHeaderExt.schema
-  });
-  constructor(input) {
-    super();
-    this.ledgerVersion = input.ledgerVersion;
-    this.previousLedgerHash = input.previousLedgerHash instanceof hash/* Hash */.V ? input.previousLedgerHash : new hash/* Hash */.V(input.previousLedgerHash);
-    this.scpValue = input.scpValue;
-    this.txSetResultHash = input.txSetResultHash instanceof hash/* Hash */.V ? input.txSetResultHash : new hash/* Hash */.V(input.txSetResultHash);
-    this.bucketListHash = input.bucketListHash instanceof hash/* Hash */.V ? input.bucketListHash : new hash/* Hash */.V(input.bucketListHash);
-    this.ledgerSeq = input.ledgerSeq;
-    this.totalCoins = input.totalCoins;
-    this.feePool = input.feePool;
-    this.inflationSeq = input.inflationSeq;
-    this.idPool = input.idPool;
-    this.baseFee = input.baseFee;
-    this.baseReserve = input.baseReserve;
-    this.maxTxSetSize = input.maxTxSetSize;
-    this.skipList = input.skipList.map(
-      (v) => v instanceof hash/* Hash */.V ? v : new hash/* Hash */.V(v)
-    );
-    this.ext = input.ext;
-  }
-  toXdrObject() {
-    return {
-      ledgerVersion: this.ledgerVersion,
-      previousLedgerHash: this.previousLedgerHash.toXdrObject(),
-      scpValue: this.scpValue.toXdrObject(),
-      txSetResultHash: this.txSetResultHash.toXdrObject(),
-      bucketListHash: this.bucketListHash.toXdrObject(),
-      ledgerSeq: this.ledgerSeq,
-      totalCoins: this.totalCoins,
-      feePool: this.feePool,
-      inflationSeq: this.inflationSeq,
-      idPool: this.idPool,
-      baseFee: this.baseFee,
-      baseReserve: this.baseReserve,
-      maxTxSetSize: this.maxTxSetSize,
-      skipList: this.skipList.map((v) => v.toXdrObject()),
-      ext: this.ext.toXdrObject()
-    };
-  }
-  static fromXdrObject(wire) {
-    return new LedgerHeader({
-      ledgerVersion: wire.ledgerVersion,
-      previousLedgerHash: hash/* Hash */.V.fromXdrObject(wire.previousLedgerHash),
-      scpValue: StellarValue.fromXdrObject(wire.scpValue),
-      txSetResultHash: hash/* Hash */.V.fromXdrObject(wire.txSetResultHash),
-      bucketListHash: hash/* Hash */.V.fromXdrObject(wire.bucketListHash),
-      ledgerSeq: wire.ledgerSeq,
-      totalCoins: wire.totalCoins,
-      feePool: wire.feePool,
-      inflationSeq: wire.inflationSeq,
-      idPool: wire.idPool,
-      baseFee: wire.baseFee,
-      baseReserve: wire.baseReserve,
-      maxTxSetSize: wire.maxTxSetSize,
-      skipList: wire.skipList.map((w) => hash/* Hash */.V.fromXdrObject(w)),
-      ext: LedgerHeaderExt.fromXdrObject(wire.ext)
-    });
-  }
-}
-
-
-//# sourceMappingURL=ledger-header.js.map
-
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header-history-entry-ext.js
-
-
-
-class LedgerHeaderHistoryEntryExtBase extends xdr_value/* XdrValue */.SD {
-  constructor() {
-    super();
-    if (new.target === LedgerHeaderHistoryEntryExtBase) {
-      throw new TypeError(
-        "new xdr.LedgerHeaderHistoryEntryExt(...) is not supported: XDR unions are built from per-variant factories. Call xdr.LedgerHeaderHistoryEntryExt.v0() (or another arm factory) instead."
-      );
-    }
-  }
-  static schema = (0,js_xdr/* union */.KC)(
-    "LedgerHeaderHistoryEntryExt",
-    {
-      switchOn: (0,js_xdr/* int32 */.HA)(),
-      cases: [(0,js_xdr/* case */.DH)("v0", 0, (0,js_xdr/* void */.rI)())],
-      switchKey: "v"
-    }
-  );
-  static v0() {
-    return new LedgerHeaderHistoryEntryExtV0();
-  }
-  static fromXdrObject(wire) {
-    switch (wire.v) {
-      case 0:
-        return new LedgerHeaderHistoryEntryExtV0();
-    }
-    throw new js_xdr/* XdrError */.zj(
-      `LedgerHeaderHistoryEntryExt: unknown v ${wire.v}`
-    );
-  }
-  /**
-   * Type guard narrowing an unknown value to a concrete LedgerHeaderHistoryEntryExt variant.
-   * Use this instead of `instanceof LedgerHeaderHistoryEntryExt`: the exported `LedgerHeaderHistoryEntryExt` value
-   * is the abstract base, so `instanceof` narrows to the base (not the
-   * variant union) and forces a cast. `LedgerHeaderHistoryEntryExt.is(x)` narrows to the union.
-   */
-  static is(value) {
-    return value instanceof LedgerHeaderHistoryEntryExtBase;
-  }
-}
-class LedgerHeaderHistoryEntryExtV0 extends LedgerHeaderHistoryEntryExtBase {
-  type = "v0";
-  get value() {
-    return null;
-  }
-  toXdrObject() {
-    return { v: 0 };
-  }
-}
-const LedgerHeaderHistoryEntryExt = LedgerHeaderHistoryEntryExtBase;
-
-
-//# sourceMappingURL=ledger-header-history-entry-ext.js.map
-
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-header-history-entry.js
-
-
-
-
-
-
-class LedgerHeaderHistoryEntry extends xdr_value/* XdrValue */.SD {
-  hash;
-  header;
-  ext;
-  static schema = (0,js_xdr/* struct */.w3)(
-    "LedgerHeaderHistoryEntry",
-    {
-      hash: hash/* Hash */.V.schema,
-      header: LedgerHeader.schema,
-      ext: LedgerHeaderHistoryEntryExt.schema
-    }
-  );
-  constructor(input) {
-    super();
-    this.hash = input.hash instanceof hash/* Hash */.V ? input.hash : new hash/* Hash */.V(input.hash);
-    this.header = input.header;
-    this.ext = input.ext;
-  }
-  toXdrObject() {
-    return {
-      hash: this.hash.toXdrObject(),
-      header: this.header.toXdrObject(),
-      ext: this.ext.toXdrObject()
-    };
-  }
-  static fromXdrObject(wire) {
-    return new LedgerHeaderHistoryEntry({
-      hash: hash/* Hash */.V.fromXdrObject(wire.hash),
-      header: LedgerHeader.fromXdrObject(wire.header),
-      ext: LedgerHeaderHistoryEntryExt.fromXdrObject(wire.ext)
-    });
-  }
-}
-
-
-//# sourceMappingURL=ledger-header-history-entry.js.map
-
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/transaction-envelope.js
-var transaction_envelope = __nccwpck_require__(9675);
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/transaction-set.js
-
-
-
-
-
-class TransactionSet extends xdr_value/* XdrValue */.SD {
-  previousLedgerHash;
-  txs;
-  static schema = (0,js_xdr/* struct */.w3)(
-    "TransactionSet",
-    {
-      previousLedgerHash: hash/* Hash */.V.schema,
-      txs: (0,js_xdr/* array */.YO)(transaction_envelope/* TransactionEnvelope */.BB.schema, js_xdr/* UNBOUNDED_MAX_LENGTH */.dp)
-    }
-  );
-  constructor(input) {
-    super();
-    this.previousLedgerHash = input.previousLedgerHash instanceof hash/* Hash */.V ? input.previousLedgerHash : new hash/* Hash */.V(input.previousLedgerHash);
-    this.txs = input.txs;
-  }
-  toXdrObject() {
-    return {
-      previousLedgerHash: this.previousLedgerHash.toXdrObject(),
-      txs: this.txs.map((v) => v.toXdrObject())
-    };
-  }
-  static fromXdrObject(wire) {
-    return new TransactionSet({
-      previousLedgerHash: hash/* Hash */.V.fromXdrObject(wire.previousLedgerHash),
-      txs: wire.txs.map((w) => transaction_envelope/* TransactionEnvelope */.BB.fromXdrObject(w))
-    });
-  }
-}
-
-
-//# sourceMappingURL=transaction-set.js.map
-
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/transaction-result-pair.js
 
 
@@ -63923,8 +64417,8 @@ const LedgerCloseMeta = LedgerCloseMetaBase;
 
 //# sourceMappingURL=ledger-close-meta.js.map
 
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 5 modules
-var sc_val = __nccwpck_require__(9679);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 4 modules
+var sc_val = __nccwpck_require__(8497);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-authorization-entry.js
 var soroban_authorization_entry = __nccwpck_require__(2813);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/rpc/parsers.js
@@ -64022,18 +64516,37 @@ function parseRawEvents(raw) {
     latestLedgerCloseTime: raw.latestLedgerCloseTime,
     oldestLedgerCloseTime: raw.oldestLedgerCloseTime,
     cursor: raw.cursor,
+    events: (raw.events ?? []).map(parseRawEvent)
+  };
+}
+function parseRawEvent(evt) {
+  const clone = { ...evt };
+  delete clone.contractId;
+  return {
+    ...clone,
+    ...evt.contractId !== "" && {
+      contractId: new contract/* Contract */.N(evt.contractId)
+    },
+    topic: (evt.topic ?? []).map((topic) => sc_val/* ScVal */.wq.fromXdr(topic, "base64")),
+    value: sc_val/* ScVal */.wq.fromXdr(evt.value, "base64")
+  };
+}
+function parseRawQueryEvents(raw) {
+  return {
     events: (raw.events ?? []).map((evt) => {
-      const clone = { ...evt };
-      delete clone.contractId;
-      return {
-        ...clone,
-        ...evt.contractId !== "" && {
-          contractId: new contract/* Contract */.N(evt.contractId)
-        },
-        topic: (evt.topic ?? []).map((topic) => sc_val/* ScVal */.wq.fromXdr(topic, "base64")),
-        value: sc_val/* ScVal */.wq.fromXdr(evt.value, "base64")
-      };
-    })
+      const { value } = evt;
+      if (typeof value !== "string") {
+        throw new Error(
+          'queryEvents event has no base64 value; was xdrFormat "json"?'
+        );
+      }
+      return parseRawEvent({ ...evt, value });
+    }),
+    ...raw.cursor !== void 0 && { cursor: raw.cursor },
+    scanStatus: raw.scanStatus,
+    scannedLedger: raw.scannedLedger,
+    oldestLedger: raw.oldestLedger,
+    latestLedger: raw.latestLedger
   };
 }
 function parseRawLedgerEntries(raw) {
@@ -64176,7 +64689,7 @@ __nccwpck_require__.d(__webpack_exports__, {
   vO: () => (/* binding */ RpcServer)
 });
 
-// UNUSED EXPORTS: BasicSleepStrategy, Durability, LinearSleepStrategy
+// UNUSED EXPORTS: BasicSleepStrategy, Durability, LinearSleepStrategy, MAX_TIMEOUT_MS
 
 // EXTERNAL MODULE: ./node_modules/uint8array-extras/index.js
 var uint8array_extras = __nccwpck_require__(5770);
@@ -64596,9 +65109,14 @@ function buildBoundedUrl(config) {
     const qs = new URLSearchParams(
       config.params
     ).toString();
+    url = stripFragment(url);
     url += (url.includes("?") ? "&" : "?") + qs;
   }
   return url;
+}
+function stripFragment(url) {
+  const hashIndex = url.indexOf("#");
+  return hashIndex === -1 ? url : url.slice(0, hashIndex);
 }
 function encodeRequestBody(data, headers) {
   if (data === void 0 || data === null) return void 0;
@@ -64696,21 +65214,44 @@ function applyRedirectSemantics(init, status) {
   headers.delete("content-type");
   headers.delete("content-length");
   headers.delete("transfer-encoding");
+  headers.delete("content-encoding");
+  headers.delete("content-language");
+  headers.delete("content-location");
+  headers.delete("content-range");
   next.headers = headers;
   return next;
 }
-function stripCrossOriginAuth(init, fromUrl, toUrl) {
-  let sameOrigin;
-  try {
-    sameOrigin = new URL(fromUrl).origin === new URL(toUrl).origin;
-  } catch {
-    sameOrigin = false;
-  }
-  if (sameOrigin) return init;
-  const headers = new Headers(init.headers || {});
-  headers.delete("authorization");
-  headers.delete("proxy-authorization");
-  headers.delete("cookie");
+const SAFE_CROSS_ORIGIN_HEADERS = /* @__PURE__ */ new Set([
+  "accept",
+  "accept-encoding",
+  "accept-language",
+  "content-type",
+  "content-length",
+  "content-encoding",
+  "content-language",
+  "content-location",
+  "content-range",
+  "user-agent",
+  "range",
+  "if-range",
+  "if-match",
+  "if-none-match",
+  "if-modified-since",
+  "if-unmodified-since",
+  "cache-control",
+  "pragma",
+  "x-client-name",
+  "x-client-version",
+  "x-app-name",
+  "x-app-version"
+]);
+function stripCrossOriginHeaders(init, fromUrl, toUrl) {
+  if (fromUrl.origin === toUrl.origin) return init;
+  const source = init.headers instanceof Headers ? init.headers : new Headers(init.headers || {});
+  const headers = new Headers();
+  source.forEach((value, name) => {
+    if (SAFE_CROSS_ORIGIN_HEADERS.has(name)) headers.set(name, value);
+  });
   return { ...init, headers };
 }
 function buildHttpError(response, config, data) {
@@ -64726,6 +65267,7 @@ function buildHttpError(response, config, data) {
   };
   return err;
 }
+let strictUtf8Decoder;
 async function boundedFetchAdapter(config) {
   const { maxRedirects, maxContentLength, timeout } = config;
   const signals = [];
@@ -64755,12 +65297,13 @@ async function boundedFetchAdapter(config) {
     redirect,
     ...signal ? { signal } : {}
   };
-  let currentUrl = buildBoundedUrl(config);
+  const startUrl = buildBoundedUrl(config);
+  let current;
   let redirectsRemaining = maxRedirects ?? 0;
   let response;
   while (true) {
     try {
-      response = await fetch(currentUrl, currentInit);
+      response = await fetch(current?.href ?? startUrl, currentInit);
     } catch (err) {
       if (err?.name === "TimeoutError") {
         throw new Error(`timeout of ${config.timeout}ms exceeded`);
@@ -64775,10 +65318,17 @@ async function boundedFetchAdapter(config) {
     }
     const location = response.headers.get("location");
     if (!location) break;
-    const nextUrl = new URL(location, currentUrl).toString();
+    const from = current ?? new URL(startUrl);
+    const target = new URL(location, from);
+    if (target.protocol !== "http:" && target.protocol !== "https:") {
+      throw new Error(`Unsupported protocol ${target.protocol}`);
+    }
+    if (from.protocol === "https:" && target.protocol === "http:") {
+      throw new Error("Redirect from https: to http: is not allowed");
+    }
     currentInit = applyRedirectSemantics(currentInit, response.status);
-    currentInit = stripCrossOriginAuth(currentInit, currentUrl, nextUrl);
-    currentUrl = nextUrl;
+    currentInit = stripCrossOriginHeaders(currentInit, from, target);
+    current = target;
     redirectsRemaining -= 1;
   }
   if (!response.ok) {
@@ -64797,7 +65347,13 @@ async function boundedFetchAdapter(config) {
     throw buildHttpError(response, config, errBody);
   }
   const bytes = await readBodyBounded(response, maxContentLength);
-  const text = new TextDecoder().decode(bytes);
+  strictUtf8Decoder ??= new TextDecoder("utf-8", { fatal: true });
+  let text;
+  try {
+    text = strictUtf8Decoder.decode(bytes);
+  } catch (err) {
+    throw new Error("Response body is not valid UTF-8", { cause: err });
+  }
   let data = text;
   try {
     data = JSON.parse(text);
@@ -64830,6 +65386,12 @@ function createFetchClient(fetchConfig = {}) {
       adapter: (config) => {
         if (config.maxRedirects !== void 0 || config.maxContentLength !== void 0) {
           return boundedFetchAdapter(config);
+        }
+        if (config.url?.includes("#") && config.params && Object.keys(config.params).length > 0) {
+          return instance.request({
+            ...config,
+            url: stripFragment(config.url)
+          });
         }
         return instance.request(config);
       }
@@ -65006,14 +65568,15 @@ const fetchClient = createFetchClient();
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/rpc/axios.js
 
 
-const version = "17.0.1";
-function createHttpClient(headers) {
+const version = "17.4.0";
+function createHttpClient(headers, timeout) {
   return createFetchClient({
     headers: {
       ...headers,
       "X-Client-Name": "js-stellar-sdk",
       "X-Client-Version": version
-    }
+    },
+    timeout
   });
 }
 
@@ -65046,8 +65609,8 @@ async function postObject(client, url, method, param = null) {
 var api = __nccwpck_require__(2361);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/rpc/transaction.js
 var transaction = __nccwpck_require__(9753);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/rpc/parsers.js + 122 modules
-var parsers = __nccwpck_require__(1875);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/rpc/parsers.js + 124 modules
+var parsers = __nccwpck_require__(9350);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/utils.js
 class Utils {
   /**
@@ -65091,8 +65654,8 @@ var ledger_key_claimable_balance = __nccwpck_require__(1867);
 var contract_data_durability = __nccwpck_require__(3079);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/ledger-key-contract-data.js
 var ledger_key_contract_data = __nccwpck_require__(4783);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 5 modules
-var sc_val = __nccwpck_require__(9679);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 4 modules
+var sc_val = __nccwpck_require__(8497);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/hash.js
 var hash = __nccwpck_require__(4448);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/transaction-meta.js + 10 modules
@@ -65137,6 +65700,87 @@ var Durability = /* @__PURE__ */ ((Durability2) => {
   return Durability2;
 })(Durability || {});
 const DEFAULT_GET_TRANSACTION_TIMEOUT = 30;
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+function isSet(value) {
+  return value !== void 0 && value !== null;
+}
+function encodeQueryEventsNumber(name, value, max = Number.MAX_SAFE_INTEGER) {
+  if (!Number.isInteger(value) || value < 0 || value > max) {
+    throw new TypeError(
+      `queryEvents ${name} must be an integer from 0 to ${max}`
+    );
+  }
+  return value;
+}
+function encodeQueryEventsTopic(name, topic) {
+  if (topic === "*") {
+    throw new TypeError(
+      `queryEvents filter ${name} cannot be "*"; omit it to match any value`
+    );
+  }
+  if (typeof topic === "string") {
+    return topic;
+  }
+  if (typeof topic === "object" && topic !== null && typeof topic.toXdr === "function") {
+    return topic.toXdr("base64");
+  }
+  throw new TypeError(
+    `queryEvents filter ${name} must be a base64 string or an ScVal`
+  );
+}
+function encodeQueryEventsFilter(filter) {
+  if (typeof filter !== "object" || filter === null) {
+    throw new TypeError("queryEvents filter must be an object");
+  }
+  const f = filter;
+  const out = {};
+  if (isSet(f.type) && f.type !== "") {
+    out.type = f.type;
+  }
+  if (isSet(f.contractId) && f.contractId !== "") {
+    out.contractId = f.contractId;
+  }
+  for (const key of ["topic0", "topic1", "topic2", "topic3"]) {
+    if (isSet(f[key]) && f[key] !== "") {
+      out[key] = encodeQueryEventsTopic(key, f[key]);
+    }
+  }
+  return out;
+}
+function encodeQueryEventsRequest(request) {
+  const r = request;
+  const rangeKeySet = ["minLedger", "maxLedger", "order", "filters"].some(
+    (key) => isSet(r[key])
+  );
+  if ("cursor" in r && (isSet(r.cursor) || !rangeKeySet) && (typeof r.cursor !== "string" || r.cursor === "")) {
+    throw new TypeError("queryEvents cursor must be a non-empty string");
+  }
+  const out = {};
+  for (const key of ["minLedger", "maxLedger"]) {
+    if (isSet(r[key])) {
+      const value = encodeQueryEventsNumber(key, r[key], 2 ** 32 - 1);
+      if (value !== 0) {
+        out[key] = value;
+      }
+    }
+  }
+  if (isSet(r.order) && r.order !== "") {
+    out.order = r.order;
+  }
+  if (isSet(r.filters)) {
+    if (!Array.isArray(r.filters)) {
+      throw new TypeError("queryEvents filters must be an array");
+    }
+    out.filters = r.filters.map(encodeQueryEventsFilter);
+  }
+  if (isSet(r.cursor)) {
+    out.cursor = r.cursor;
+  }
+  if (isSet(r.limit)) {
+    out.limit = encodeQueryEventsNumber("limit", r.limit);
+  }
+  return out;
+}
 const BasicSleepStrategy = (_iter) => 1e3;
 const LinearSleepStrategy = (iter) => 1e3 * iter;
 function findCreatedAccountSequenceInTransactionMeta(meta) {
@@ -65168,6 +65812,20 @@ function findCreatedAccountSequenceInTransactionMeta(meta) {
   }
   throw new Error("No account created in transaction");
 }
+function containsMuxedAddress(val) {
+  switch (val.type) {
+    case "scvAddress":
+      return val.value.type === "scAddressTypeMuxedAccount" || val.value.type === "scAddressTypeMuxedContract";
+    case "scvVec":
+      return (val.value ?? []).some(containsMuxedAddress);
+    case "scvMap":
+      return (val.value ?? []).some(
+        (e) => containsMuxedAddress(e.key) || containsMuxedAddress(e.val)
+      );
+    default:
+      return false;
+  }
+}
 function contractSpecTypeName(td) {
   if (td.type === "scSpecTypeUdt") {
     return td.value.name.toString();
@@ -65195,7 +65853,13 @@ class RpcServer {
   httpClient;
   constructor(serverURL, opts = {}) {
     this.serverURL = new URL(serverURL);
-    this.httpClient = createHttpClient(opts.headers);
+    const { timeout } = opts;
+    if (timeout !== void 0 && !(Number.isInteger(timeout) && timeout >= 0 && timeout <= MAX_TIMEOUT_MS)) {
+      throw new Error(
+        `timeout must be 0 or a whole number of milliseconds up to ${MAX_TIMEOUT_MS}, got ${String(timeout)}`
+      );
+    }
+    this.httpClient = createHttpClient(opts.headers, timeout);
     if (this.serverURL.protocol !== "https:" && !opts.allowHttp) {
       throw new Error(
         "Cannot connect to insecure Soroban RPC server if `allowHttp` isn't set"
@@ -65377,8 +66041,8 @@ class RpcServer {
    * @returns Resolves with balance entry details
    *    when available.
    *
-   * @throws If the supplied `address` is not a valid account or
-   *    contract strkey.
+   * @throws If the supplied `address` is not a valid account or contract
+   *    strkey, or is a muxed address (`M...` or `W...`).
    *
    * @example
    * ```ts
@@ -65424,6 +66088,7 @@ class RpcServer {
     } else if (strkey/* StrKey */.L8.isValidContract(addr)) {
       return this.getSACBalance(addr, asset, networkPassphrase);
     }
+    (0,base_address/* assertNotMuxed */.N)(addr, "has no balance of its own; use its base address");
     throw new Error(`invalid address: ${address}`);
   }
   /**
@@ -65465,6 +66130,9 @@ class RpcServer {
    *    or 'persistent' (the default), see {@link rpc.Durability}.
    * @returns The current data value
    *
+   * @throws If `contract` is a muxed address, or `key` contains a muxed
+   *    address (`M...` or `W...`).
+   *
    * **Warning:** If the data entry in question is a 'temporary' entry, it's
    * entirely possible that it has expired out of existence.
    *
@@ -65484,6 +66152,12 @@ class RpcServer {
    */
   async getContractData(contract, key, durability = "persistent" /* Persistent */) {
     let scAddress;
+    if (typeof contract === "string" || contract instanceof base_address/* Address */.p) {
+      (0,base_address/* assertNotMuxed */.N)(
+        contract,
+        "cannot own contract data; use its base address"
+      );
+    }
     if (typeof contract === "string") {
       scAddress = new base_contract/* Contract */.N(contract).address().toScAddress();
     } else if (contract instanceof base_address/* Address */.p) {
@@ -65492,6 +66166,11 @@ class RpcServer {
       scAddress = contract.address().toScAddress();
     } else {
       throw new TypeError(`unknown contract type: ${contract}`);
+    }
+    if (containsMuxedAddress(key)) {
+      throw new TypeError(
+        "contract data keys cannot contain muxed addresses (M... or W...)"
+      );
     }
     let xdrDurability;
     switch (durability) {
@@ -65511,9 +66190,8 @@ class RpcServer {
         durability: xdrDurability
       })
     );
-    try {
-      return await this.getLedgerEntry(contractKey);
-    } catch {
+    const { entries } = await this.getLedgerEntries(contractKey);
+    if (entries.length !== 1) {
       throw {
         code: 404,
         message: `Contract data not found for ${base_address/* Address */.p.fromScAddress(
@@ -65521,6 +66199,7 @@ class RpcServer {
         ).toString()} with key ${key.toXdr("base64")} and durability: ${durability}`
       };
     }
+    return entries[0];
   }
   /**
    * Retrieves the deployed contract instance for a given contract ID.
@@ -66104,6 +66783,43 @@ class RpcServer {
     );
   }
   /**
+   * Fetch one page of contract and system events with the `queryEvents`
+   * method, which only the archival RPC node serves (in beta). To page, send
+   * `{ cursor, limit }` from the response while `scanStatus` is `HAS_MORE`,
+   * wait and retry on `WAITING_FOR_LEDGERS`, and stop on `OLDEST_REACHED` or
+   * `COMPLETE`.
+   *
+   * @param request - a ledger range query or a cursor continuation
+   * @returns one page of parsed events and the scan status
+   *
+   * @example
+   * ```ts
+   * let res = await server.queryEvents({ minLedger: 1000, limit: 50 });
+   * for (;;) {
+   *   handle(res.events);
+   *   if (res.scanStatus === rpc.Api.QueryEventsScanStatus.WAITING_FOR_LEDGERS) {
+   *     await new Promise((resolve) => setTimeout(resolve, 5000));
+   *   } else if (res.scanStatus !== rpc.Api.QueryEventsScanStatus.HAS_MORE) {
+   *     break;
+   *   }
+   *   res = await server.queryEvents({ cursor: res.cursor!, limit: 50 });
+   * }
+   * ```
+   */
+  async queryEvents(request) {
+    return this._queryEvents(encodeQueryEventsRequest(request)).then(
+      parsers/* parseRawQueryEvents */.B5
+    );
+  }
+  async _queryEvents(request) {
+    return postObject(
+      this.httpClient,
+      this.serverURL.toString(),
+      "queryEvents",
+      request
+    );
+  }
+  /**
    * Fetch metadata about the network this Soroban RPC server is connected to.
    *
    * @returns Metadata about the current
@@ -66564,7 +67280,7 @@ class RpcServer {
    *    entry details if and only if the request returned a valid balance ledger
    *    entry. If it doesn't, the `balanceEntry` field will not exist.
    *
-   * @throws If `address` is not a valid contract ID (C...).
+   * @throws If `address` is not a valid contract ID (`C...`).
    *
    * @see getLedgerEntries
    * @see https://developers.stellar.org/docs/tokens/stellar-asset-contract
@@ -66590,6 +67306,10 @@ class RpcServer {
   async getSACBalance(address, sac, networkPassphrase) {
     const addressString = address instanceof base_address/* Address */.p ? address.toString() : address;
     if (!strkey/* StrKey */.L8.isValidContract(addressString)) {
+      (0,base_address/* assertNotMuxed */.N)(
+        addressString,
+        "has no balance of its own; use its base address"
+      );
       throw new TypeError(`expected contract ID, got ${addressString}`);
     }
     const passphrase = networkPassphrase ?? await this.getNetwork().then((n) => n.passphrase);
@@ -66710,7 +67430,7 @@ class RpcServer {
 /* harmony import */ var _base_operation_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(1843);
 /* harmony import */ var _base_transaction_builder_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(2931);
 /* harmony import */ var _api_js__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(2361);
-/* harmony import */ var _parsers_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(1875);
+/* harmony import */ var _parsers_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9350);
 
 
 
@@ -66766,7 +67486,7 @@ function assembleTransaction(raw, simulation) {
     }
   }
   if (rawSorobanData) {
-    if (classicFeeNum - rawSorobanData.resourceFee > BigInt(0)) {
+    if (classicFeeNum >= rawSorobanData.resourceFee) {
       classicFeeNum -= rawSorobanData.resourceFee;
     }
   }
@@ -68501,8 +69221,8 @@ class ContractEventType extends enum_value/* EnumValue */.RS {
 
 //# sourceMappingURL=contract-event-type.js.map
 
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 5 modules
-var sc_val = __nccwpck_require__(9679);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 4 modules
+var sc_val = __nccwpck_require__(8497);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/contract-event-v0.js
 
 
@@ -69226,7 +69946,7 @@ class CreateClaimableBalanceOp extends _values_xdr_value_js__WEBPACK_IMPORTED_MO
 /* harmony import */ var _values_xdr_value_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7690);
 /* harmony import */ var _contract_id_preimage_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(9206);
 /* harmony import */ var _contract_executable_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(7681);
-/* harmony import */ var _sc_val_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(9679);
+/* harmony import */ var _sc_val_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(8497);
 
 
 
@@ -70852,7 +71572,7 @@ class Int256Parts extends _values_xdr_value_js__WEBPACK_IMPORTED_MODULE_0__/* .X
 /* harmony import */ var _values_xdr_value_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7690);
 /* harmony import */ var _values_xdr_string_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(4503);
 /* harmony import */ var _sc_address_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(3309);
-/* harmony import */ var _sc_val_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(9679);
+/* harmony import */ var _sc_val_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(8497);
 
 
 
@@ -72615,8 +73335,8 @@ class LiquidityPoolEntry extends xdr_value/* XdrValue */.SD {
 
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-address.js + 1 modules
 var sc_address = __nccwpck_require__(3309);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 5 modules
-var sc_val = __nccwpck_require__(9679);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 4 modules
+var sc_val = __nccwpck_require__(8497);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/contract-data-durability.js
 var contract_data_durability = __nccwpck_require__(3079);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/contract-data-entry.js
@@ -75166,7 +75886,7 @@ class LedgerKeyContractCode extends _values_xdr_value_js__WEBPACK_IMPORTED_MODUL
 /* harmony import */ var _stellar_js_xdr__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5133);
 /* harmony import */ var _values_xdr_value_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7690);
 /* harmony import */ var _sc_address_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(3309);
-/* harmony import */ var _sc_val_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(9679);
+/* harmony import */ var _sc_val_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(8497);
 /* harmony import */ var _contract_data_durability_js__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(3079);
 
 
@@ -76409,6 +77129,11 @@ class MemoText extends MemoBase {
     super();
     this.text = text instanceof xdr_string/* XdrString */.u ? text : new xdr_string/* XdrString */.u(text);
   }
+  /**
+   * Decodes `text` leniently: invalid bytes become U+FFFD, so a
+   * value rebuilt from this string can differ on the wire. Use
+   * `text` to keep the bytes.
+   */
   get value() {
     return this.text.toString();
   }
@@ -76670,6 +77395,51 @@ const MuxedAccount = MuxedAccountBase;
 
 
 //# sourceMappingURL=muxed-account.js.map
+
+
+/***/ }),
+
+/***/ 4036:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   k: () => (/* binding */ MuxedContract)
+/* harmony export */ });
+/* harmony import */ var _stellar_js_xdr__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5133);
+/* harmony import */ var _values_xdr_value_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7690);
+/* harmony import */ var _contract_id_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(7662);
+
+
+
+
+class MuxedContract extends _values_xdr_value_js__WEBPACK_IMPORTED_MODULE_0__/* .XdrValue */ .SD {
+  id;
+  contractId;
+  static schema = (0,_stellar_js_xdr__WEBPACK_IMPORTED_MODULE_1__/* .struct */ .w3)("MuxedContract", {
+    id: (0,_stellar_js_xdr__WEBPACK_IMPORTED_MODULE_1__/* .uint64 */ .VV)(),
+    contractId: _contract_id_js__WEBPACK_IMPORTED_MODULE_2__/* .ContractId */ .K.schema
+  });
+  constructor(input) {
+    super();
+    this.id = input.id;
+    this.contractId = input.contractId;
+  }
+  toXdrObject() {
+    return {
+      id: this.id,
+      contractId: this.contractId.toXdrObject()
+    };
+  }
+  static fromXdrObject(wire) {
+    return new MuxedContract({
+      id: wire.id,
+      contractId: _contract_id_js__WEBPACK_IMPORTED_MODULE_2__/* .ContractId */ .K.fromXdrObject(wire.contractId)
+    });
+  }
+}
+
+
+//# sourceMappingURL=muxed-contract.js.map
 
 
 /***/ }),
@@ -78720,7 +79490,7 @@ __nccwpck_require__.d(__webpack_exports__, {
   lu: () => (/* binding */ ScAddress)
 });
 
-// UNUSED EXPORTS: ScAddressAccount, ScAddressClaimableBalance, ScAddressContract, ScAddressLiquidityPool, ScAddressMuxedAccount
+// UNUSED EXPORTS: ScAddressAccount, ScAddressClaimableBalance, ScAddressContract, ScAddressLiquidityPool, ScAddressMuxedAccount, ScAddressMuxedContract
 
 // EXTERNAL MODULE: ./node_modules/@stellar/js-xdr/dist/js-xdr.mjs
 var js_xdr = __nccwpck_require__(5133);
@@ -78753,13 +79523,18 @@ class ScAddressType extends enum_value/* EnumValue */.RS {
     "scAddressTypeLiquidityPool",
     4
   );
+  static scAddressTypeMuxedContract = new ScAddressType(
+    "scAddressTypeMuxedContract",
+    5
+  );
   static schema = (0,enum_value/* withMemberPrefix */.P8)(
     (0,js_xdr/* enumType */.QT)("ScAddressType", {
       scAddressTypeAccount: 0,
       scAddressTypeContract: 1,
       scAddressTypeMuxedAccount: 2,
       scAddressTypeClaimableBalance: 3,
-      scAddressTypeLiquidityPool: 4
+      scAddressTypeLiquidityPool: 4,
+      scAddressTypeMuxedContract: 5
     }),
     "scAddressType"
   );
@@ -78792,7 +79567,10 @@ var muxed_ed25519_account = __nccwpck_require__(9867);
 var claimable_balance_id = __nccwpck_require__(777);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/pool-id.js
 var pool_id = __nccwpck_require__(6634);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/muxed-contract.js
+var muxed_contract = __nccwpck_require__(4036);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-address.js
+
 
 
 
@@ -78830,6 +79608,11 @@ class ScAddressBase extends xdr_value/* XdrValue */.SD {
         "scAddressTypeLiquidityPool",
         4,
         (0,js_xdr/* field */.ZZ)("liquidityPoolId", pool_id/* PoolId */.e.schema)
+      ),
+      (0,js_xdr/* case */.DH)(
+        "scAddressTypeMuxedContract",
+        5,
+        (0,js_xdr/* field */.ZZ)("muxedContract", muxed_contract/* MuxedContract */.k.schema)
       )
     ]
   });
@@ -78848,6 +79631,9 @@ class ScAddressBase extends xdr_value/* XdrValue */.SD {
   static scAddressTypeLiquidityPool(liquidityPoolId) {
     return new ScAddressLiquidityPool(liquidityPoolId);
   }
+  static scAddressTypeMuxedContract(muxedContract) {
+    return new ScAddressMuxedContract(muxedContract);
+  }
   static fromXdrObject(wire) {
     switch (wire.type) {
       case 0:
@@ -78865,6 +79651,10 @@ class ScAddressBase extends xdr_value/* XdrValue */.SD {
       case 4:
         return new ScAddressLiquidityPool(
           pool_id/* PoolId */.e.fromXdrObject(wire.liquidityPoolId)
+        );
+      case 5:
+        return new ScAddressMuxedContract(
+          muxed_contract/* MuxedContract */.k.fromXdrObject(wire.muxedContract)
         );
     }
     throw new js_xdr/* XdrError */.zj(
@@ -78954,6 +79744,20 @@ class ScAddressLiquidityPool extends ScAddressBase {
     return { type: 4, liquidityPoolId: this.liquidityPoolId.toXdrObject() };
   }
 }
+class ScAddressMuxedContract extends ScAddressBase {
+  type = "scAddressTypeMuxedContract";
+  muxedContract;
+  constructor(muxedContract) {
+    super();
+    this.muxedContract = muxedContract;
+  }
+  get value() {
+    return this.muxedContract;
+  }
+  toXdrObject() {
+    return { type: 5, muxedContract: this.muxedContract.toXdrObject() };
+  }
+}
 const ScAddress = ScAddressBase;
 
 
@@ -78987,33 +79791,18 @@ class ScBytes extends _values_bytes_value_js__WEBPACK_IMPORTED_MODULE_0__/* .Byt
 
 /***/ }),
 
-/***/ 9679:
+/***/ 1357:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
-
-// EXPORTS
-__nccwpck_require__.d(__webpack_exports__, {
-  Dh: () => (/* binding */ ScMapEntry),
-  wq: () => (/* binding */ ScVal)
-});
-
-// UNUSED EXPORTS: ScContractInstance, ScValAddress, ScValBool, ScValBytes, ScValContractInstance, ScValDuration, ScValError, ScValExecutableTag, ScValI128, ScValI256, ScValI32, ScValI64, ScValLedgerKeyContractInstance, ScValLedgerKeyNonce, ScValMap, ScValString, ScValSymbol, ScValTimepoint, ScValU128, ScValU256, ScValU32, ScValU64, ScValVec, ScValVoid
-
-// EXTERNAL MODULE: ./node_modules/@stellar/js-xdr/dist/js-xdr.mjs
-var js_xdr = __nccwpck_require__(5133);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/xdr-value.js + 2 modules
-var xdr_value = __nccwpck_require__(7690);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/xdr-string.js
-var xdr_string = __nccwpck_require__(4503);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/contract-executable.js + 1 modules
-var contract_executable = __nccwpck_require__(7681);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/enum-value.js
-var enum_value = __nccwpck_require__(882);
-;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val-type.js
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   W: () => (/* binding */ ScValType)
+/* harmony export */ });
+/* harmony import */ var _stellar_js_xdr__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5133);
+/* harmony import */ var _values_enum_value_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(882);
 
 
 
-class ScValType extends enum_value/* EnumValue */.RS {
+class ScValType extends _values_enum_value_js__WEBPACK_IMPORTED_MODULE_0__/* .EnumValue */ .RS {
   static scvBool = new ScValType("scvBool", 0);
   static scvVoid = new ScValType("scvVoid", 1);
   static scvError = new ScValType("scvError", 2);
@@ -79043,8 +79832,8 @@ class ScValType extends enum_value/* EnumValue */.RS {
   );
   static scvLedgerKeyNonce = new ScValType("scvLedgerKeyNonce", 21);
   static scvExecutableTag = new ScValType("scvExecutableTag", 22);
-  static schema = (0,enum_value/* withMemberPrefix */.P8)(
-    (0,js_xdr/* enumType */.QT)("ScValType", {
+  static schema = (0,_values_enum_value_js__WEBPACK_IMPORTED_MODULE_0__/* .withMemberPrefix */ .P8)(
+    (0,_stellar_js_xdr__WEBPACK_IMPORTED_MODULE_1__/* .enumType */ .QT)("ScValType", {
       scvBool: 0,
       scvVoid: 1,
       scvError: 2,
@@ -79072,10 +79861,10 @@ class ScValType extends enum_value/* EnumValue */.RS {
     "scv"
   );
   static fromValue(value) {
-    return (0,enum_value/* enumFromValue */.t4)("ScValType", ScValType.schema, ScValType, value);
+    return (0,_values_enum_value_js__WEBPACK_IMPORTED_MODULE_0__/* .enumFromValue */ .t4)("ScValType", ScValType.schema, ScValType, value);
   }
   static fromName(name) {
-    return (0,enum_value/* enumFromName */.$2)("ScValType", ScValType, name);
+    return (0,_values_enum_value_js__WEBPACK_IMPORTED_MODULE_0__/* .enumFromName */ .$2)("ScValType", ScValType, name);
   }
   static fromXdrObject(wire) {
     return ScValType.fromValue(wire);
@@ -79085,6 +79874,33 @@ class ScValType extends enum_value/* EnumValue */.RS {
 
 //# sourceMappingURL=sc-val-type.js.map
 
+
+/***/ }),
+
+/***/ 8497:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+
+// EXPORTS
+__nccwpck_require__.d(__webpack_exports__, {
+  Dh: () => (/* binding */ ScMapEntry),
+  wq: () => (/* binding */ ScVal)
+});
+
+// UNUSED EXPORTS: ScContractInstance, ScValAddress, ScValBool, ScValBytes, ScValContractInstance, ScValDuration, ScValError, ScValExecutableTag, ScValI128, ScValI256, ScValI32, ScValI64, ScValLedgerKeyContractInstance, ScValLedgerKeyNonce, ScValMap, ScValString, ScValSymbol, ScValTimepoint, ScValU128, ScValU256, ScValU32, ScValU64, ScValVec, ScValVoid
+
+// EXTERNAL MODULE: ./node_modules/@stellar/js-xdr/dist/js-xdr.mjs
+var js_xdr = __nccwpck_require__(5133);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/xdr-value.js + 2 modules
+var xdr_value = __nccwpck_require__(7690);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/xdr-string.js
+var xdr_string = __nccwpck_require__(4503);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/contract-executable.js + 1 modules
+var contract_executable = __nccwpck_require__(7681);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val-type.js
+var sc_val_type = __nccwpck_require__(1357);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/values/enum-value.js
+var enum_value = __nccwpck_require__(882);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-error-type.js
 
 
@@ -79538,7 +80354,7 @@ class ScValBase extends xdr_value/* XdrValue */.SD {
     }
   }
   static schema = (0,js_xdr/* union */.KC)("ScVal", {
-    switchOn: ScValType.schema,
+    switchOn: sc_val_type/* ScValType */.W.schema,
     cases: [
       (0,js_xdr/* case */.DH)("scvBool", 0, (0,js_xdr/* field */.ZZ)("b", (0,js_xdr/* bool */.lc)())),
       (0,js_xdr/* case */.DH)("scvVoid", 1, (0,js_xdr/* void */.rI)()),
@@ -79936,6 +80752,11 @@ class ScValString extends ScValBase {
     super();
     this.str = str instanceof xdr_string/* XdrString */.u ? str : new xdr_string/* XdrString */.u(str);
   }
+  /**
+   * Decodes `str` leniently: invalid bytes become U+FFFD, so a
+   * value rebuilt from this string can differ on the wire. Use
+   * `str` to keep the bytes.
+   */
   get value() {
     return this.str.toString();
   }
@@ -79950,6 +80771,11 @@ class ScValSymbol extends ScValBase {
     super();
     this.sym = sym instanceof xdr_string/* XdrString */.u ? sym : new xdr_string/* XdrString */.u(sym);
   }
+  /**
+   * Decodes `sym` leniently: invalid bytes become U+FFFD, so a
+   * value rebuilt from this string can differ on the wire. Use
+   * `sym` to keep the bytes.
+   */
   get value() {
     return this.sym.toString();
   }
@@ -80049,6 +80875,11 @@ class ScValExecutableTag extends ScValBase {
     super();
     this.executableTag = executableTag instanceof xdr_string/* XdrString */.u ? executableTag : new xdr_string/* XdrString */.u(executableTag);
   }
+  /**
+   * Decodes `executableTag` leniently: invalid bytes become U+FFFD, so a
+   * value rebuilt from this string can differ on the wire. Use
+   * `executableTag` to keep the bytes.
+   */
   get value() {
     return this.executableTag.toString();
   }
@@ -80599,7 +81430,7 @@ class SorobanAddressCredentialsWithDelegates extends _values_xdr_value_js__WEBPA
 /* harmony import */ var _stellar_js_xdr__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5133);
 /* harmony import */ var _values_xdr_value_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7690);
 /* harmony import */ var _sc_address_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(3309);
-/* harmony import */ var _sc_val_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(9679);
+/* harmony import */ var _sc_val_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(8497);
 
 
 
@@ -81190,7 +82021,7 @@ const SorobanCredentials = SorobanCredentialsBase;
 /* harmony import */ var _stellar_js_xdr__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5133);
 /* harmony import */ var _values_xdr_value_js__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7690);
 /* harmony import */ var _sc_address_js__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(3309);
-/* harmony import */ var _sc_val_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(9679);
+/* harmony import */ var _sc_val_js__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(8497);
 
 
 
@@ -82128,8 +82959,8 @@ const SorobanTransactionMetaExt = SorobanTransactionMetaExtBase;
 
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/contract-event.js + 3 modules
 var contract_event = __nccwpck_require__(3322);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 5 modules
-var sc_val = __nccwpck_require__(9679);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 4 modules
+var sc_val = __nccwpck_require__(8497);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/diagnostic-event.js
 var diagnostic_event = __nccwpck_require__(4390);
 ;// CONCATENATED MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/soroban-transaction-meta.js
@@ -83800,6 +84631,9 @@ class Uint256Parts extends _values_xdr_value_js__WEBPACK_IMPORTED_MODULE_0__/* .
 
 
 
+
+
+
 const Int64 = makeBigIntShim(true, 64);
 const Uint64 = makeBigIntShim(false, 64);
 const Int32 = makeIntShim(true, 32);
@@ -83889,6 +84723,31 @@ function makeIntShim(signed, bits) {
 
 
 //# sourceMappingURL=index.js.map
+
+
+/***/ }),
+
+/***/ 9838:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   $: () => (/* binding */ isUnionVariant)
+/* harmony export */ });
+/* unused harmony export expectUnionVariant */
+function expectUnionVariant(value, type) {
+  if (value.type !== type) {
+    throw new TypeError(
+      `Expected XDR variant '${type}', got '${value.type}' (${value.constructor.name})`
+    );
+  }
+  return value;
+}
+function isUnionVariant(value, type) {
+  return value.type === type;
+}
+
+
+//# sourceMappingURL=util.js.map
 
 
 /***/ }),
@@ -84126,6 +84985,12 @@ function enumFromName(className, instances, name) {
 const HEX = "0123456789abcdef";
 class XdrString {
   bytes;
+  /**
+   * A string input is UTF-8 encoded. A lone surrogate (for example from
+   * a `slice()` that cuts a surrogate pair) encodes as U+FFFD with no
+   * error. Check `String.prototype.isWellFormed()` (ES2024) first when the
+   * input can be cut text.
+   */
   constructor(input) {
     if (input instanceof XdrString) {
       this.bytes = input.bytes.slice();
@@ -84785,6 +85650,7 @@ function asDataView(bytes) {
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 function med25519ToStrkey(w) {
+  (0,bigint_parts/* assertBigIntFits */.Mp)(w.id, false, 64, "MuxedEd25519Account.id");
   const payload = new Uint8Array(40);
   payload.set(w.ed25519, 0);
   asDataView(payload).setBigUint64(32, w.id);
@@ -84796,6 +85662,12 @@ function med25519FromStrkey(json) {
     id: asDataView(raw).getBigUint64(32),
     ed25519: raw.subarray(0, 32)
   };
+}
+function muxedContractToStrkey(w) {
+  return strkey/* StrKey */.L8.encodeMuxedContract((0,strkey/* packMuxedContract */.lo)(w.contractId, w.id));
+}
+function muxedContractFromStrkey(json) {
+  return (0,strkey/* unpackMuxedContract */.Qx)(strkey/* StrKey */.L8.decodeMuxedContract(json));
 }
 function signedPayloadToStrkey(w) {
   const buf = new Uint8Array(32 + 4 + roundUp4(w.payload.length));
@@ -84868,6 +85740,17 @@ const MED25519_OVERRIDE = {
 };
 OVERRIDES.set("MuxedEd25519Account", MED25519_OVERRIDE);
 OVERRIDES.set("MuxedAccountMed25519", MED25519_OVERRIDE);
+OVERRIDES.set("MuxedContract", {
+  toJson(wire) {
+    return muxedContractToStrkey(wire);
+  },
+  fromJson(json) {
+    if (typeof json !== "string") {
+      throw new js_xdr/* XdrError */.zj("MuxedContract: expected W-strkey string");
+    }
+    return muxedContractFromStrkey(json);
+  }
+});
 OVERRIDES.set("SignerKey", {
   toJson(wire) {
     const w = wire;
@@ -84938,6 +85821,14 @@ OVERRIDES.set("ScAddress", {
       }
       case 4:
         return strkey/* StrKey */.L8.encodeLiquidityPool(w.liquidityPoolId);
+      case 5:
+        return muxedContractToStrkey(w.muxedContract);
+      default: {
+        const unknown = w;
+        throw new js_xdr/* XdrError */.zj(
+          `ScAddress: unsupported type ${unknown.type}`
+        );
+      }
     }
   },
   fromJson(json) {
@@ -84974,6 +85865,9 @@ OVERRIDES.set("ScAddress", {
         type: 4,
         liquidityPoolId: strkey/* StrKey */.L8.decodeLiquidityPool(json)
       };
+    }
+    if (json.startsWith("W")) {
+      return { type: 5, muxedContract: muxedContractFromStrkey(json) };
     }
     throw new js_xdr/* XdrError */.zj(`ScAddress: unsupported strkey prefix in ${json}`);
   }
@@ -103246,8 +104140,8 @@ function buildManifest(opts) {
 
 // EXTERNAL MODULE: external "node:crypto"
 var external_node_crypto_ = __nccwpck_require__(7598);
-// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 5 modules
-var sc_val = __nccwpck_require__(9679);
+// EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/sc-val.js + 4 modules
+var sc_val = __nccwpck_require__(8497);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/generated/int128-parts.js
 var int128_parts = __nccwpck_require__(7013);
 // EXTERNAL MODULE: ./node_modules/@stellar/stellar-sdk/lib/esm/xdr/index.js
@@ -103387,8 +104281,9 @@ var api = __nccwpck_require__(2361);
  * committed audit trail (manifests/cycle-<id>.json) — see
  * `readLastManifestWindow` in manifest.ts. get_cycle_info(cycle_id) is used
  * only as a sanity check against that manifest. Failure modes are loud: a
- * failed submission, an unconfirmed transaction, or an unparseable contract
- * reply all throw RelayError — never "submitted" treated as "succeeded".
+ * failed submission, an unconfirmed transaction, an unparseable contract
+ * reply, or a post-relay readback that disagrees with the submitted root all
+ * throw RelayError — never "submitted" treated as "succeeded".
  */
 class RelayError extends Error {
     constructor(message, options) {
@@ -103511,6 +104406,52 @@ async function queryCycleInfo(server, vault, sourcePubkey, networkPassphrase, cy
     }
     return parseCycleInfo(retval);
 }
+/**
+ * Reads a cycle back from chain after a relay and asserts the stored root and
+ * total match what was submitted.
+ *
+ * A confirmed transaction only proves the call executed — not that it hit the
+ * vault we expected, or that the contract stored the values we computed. This
+ * closes that gap: `post_cycle_root` is only reported as relayed once
+ * `get_cycle_info(cycleId)` returns the submitted root and total amount.
+ * Throws {@link RelayError} on a missing cycle or any mismatch.
+ */
+async function verifyPostedCycle(opts) {
+    const info = await queryCycleInfo(opts.server, opts.vault, opts.sourcePubkey, opts.networkPassphrase, opts.cycleId);
+    if (info === null) {
+        throw new RelayError(`post_cycle_root(${opts.cycleId}) confirmed but get_cycle_info(${opts.cycleId}) returned no cycle; ` +
+            `the transaction may have hit a different contract than the registry's vaultContract`);
+    }
+    if (!info.root.equals(opts.root)) {
+        throw new RelayError(`on-chain root mismatch for cycle ${opts.cycleId}: submitted ${opts.root.toString('hex')}, ` +
+            `stored ${Buffer.from(info.root).toString('hex')}`);
+    }
+    if (info.totalAmount !== opts.totalAmount) {
+        throw new RelayError(`on-chain total mismatch for cycle ${opts.cycleId}: submitted ${opts.totalAmount}, ` +
+            `stored ${info.totalAmount}`);
+    }
+    return info;
+}
+/**
+ * Parses the RPC's ledger close time into unix seconds.
+ *
+ * `getLedgers` returns `ledgerCloseTime` as a *string of unix seconds*
+ * (`"1795767464"`). `new Date("1795767464")` is an Invalid Date, so the value
+ * must be coerced and multiplied by 1000 rather than handed to `Date` — a
+ * numeric ledger-close time is accepted too, so an SDK that switches the field
+ * to a number does not break this.
+ */
+function ledgerCloseTimeSeconds(raw) {
+    const value = typeof raw === 'number'
+        ? raw
+        : /^\d+$/.test(raw.trim())
+            ? Number(raw.trim())
+            : Number.NaN;
+    if (!Number.isSafeInteger(value) || value <= 0) {
+        throw new RelayError(`Soroban RPC returned an unusable ledger close time: '${String(raw)}'`);
+    }
+    return value;
+}
 /** Close time (ISO 8601) of a specific ledger, via RPC getLedgers. */
 async function ledgerCloseTime(server, ledgerSeq) {
     let response;
@@ -103524,7 +104465,7 @@ async function ledgerCloseTime(server, ledgerSeq) {
     if (ledger === undefined || ledger.sequence !== ledgerSeq) {
         throw new RelayError(`Soroban RPC returned no ledger ${ledgerSeq} (oldest available: ${response.oldestLedger})`);
     }
-    return new Date(ledger.ledgerCloseTime).toISOString();
+    return new Date(ledgerCloseTimeSeconds(ledger.ledgerCloseTime) * 1000).toISOString();
 }
 /**
  * Builds, signs, submits and confirms `post_cycle_root(cycle_id, root, total_amount)`.
@@ -103599,6 +104540,20 @@ async function relayCycleRoot(opts) {
         const ledger = confirmed.status === api/* Api */.j.GetTransactionStatus.FAILED ? ` (ledger=${confirmed.ledger})` : '';
         throw new RelayError(`post_cycle_root transaction ${sent.hash} did not land: status=${confirmed.status}${ledger}; inspect the transaction on an explorer`);
     }
+    // A SUCCESS status only proves the call executed. Read the cycle back and
+    // compare the stored root/amount before reporting the relay as complete —
+    // this is what makes "relayed" mean "the chain agrees with the manifest".
+    const onChain = await verifyPostedCycle({
+        server,
+        vault,
+        sourcePubkey: keypair.publicKey(),
+        networkPassphrase,
+        cycleId,
+        root,
+        totalAmount,
+    });
+    info(`verified on-chain: cycle ${cycleId} root and total_amount match the manifest ` +
+        `(posted_at=${onChain.postedAt}, claims_started=${onChain.claimsStarted})`);
     return { hash: sent.hash, status: confirmed.status, ledger: confirmed.ledger };
 }
 function describeRelayError(err) {
