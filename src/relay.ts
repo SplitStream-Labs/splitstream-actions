@@ -33,8 +33,9 @@ import { scvI128 } from './merkle.js';
  * committed audit trail (manifests/cycle-<id>.json) — see
  * `readLastManifestWindow` in manifest.ts. get_cycle_info(cycle_id) is used
  * only as a sanity check against that manifest. Failure modes are loud: a
- * failed submission, an unconfirmed transaction, or an unparseable contract
- * reply all throw RelayError — never "submitted" treated as "succeeded".
+ * failed submission, an unconfirmed transaction, an unparseable contract
+ * reply, or a post-relay readback that disagrees with the submitted root all
+ * throw RelayError — never "submitted" treated as "succeeded".
  */
 
 export class RelayError extends Error {
@@ -203,6 +204,75 @@ export async function queryCycleInfo(
   return parseCycleInfo(retval);
 }
 
+/**
+ * Reads a cycle back from chain after a relay and asserts the stored root and
+ * total match what was submitted.
+ *
+ * A confirmed transaction only proves the call executed — not that it hit the
+ * vault we expected, or that the contract stored the values we computed. This
+ * closes that gap: `post_cycle_root` is only reported as relayed once
+ * `get_cycle_info(cycleId)` returns the submitted root and total amount.
+ * Throws {@link RelayError} on a missing cycle or any mismatch.
+ */
+export async function verifyPostedCycle(opts: {
+  server: rpc.Server;
+  vault: Contract;
+  sourcePubkey: string;
+  networkPassphrase: string;
+  cycleId: number;
+  root: Buffer;
+  totalAmount: bigint;
+}): Promise<CycleInfo> {
+  const info = await queryCycleInfo(
+    opts.server,
+    opts.vault,
+    opts.sourcePubkey,
+    opts.networkPassphrase,
+    opts.cycleId,
+  );
+  if (info === null) {
+    throw new RelayError(
+      `post_cycle_root(${opts.cycleId}) confirmed but get_cycle_info(${opts.cycleId}) returned no cycle; ` +
+        `the transaction may have hit a different contract than the registry's vaultContract`,
+    );
+  }
+  if (!info.root.equals(opts.root)) {
+    throw new RelayError(
+      `on-chain root mismatch for cycle ${opts.cycleId}: submitted ${opts.root.toString('hex')}, ` +
+        `stored ${Buffer.from(info.root).toString('hex')}`,
+    );
+  }
+  if (info.totalAmount !== opts.totalAmount) {
+    throw new RelayError(
+      `on-chain total mismatch for cycle ${opts.cycleId}: submitted ${opts.totalAmount}, ` +
+        `stored ${info.totalAmount}`,
+    );
+  }
+  return info;
+}
+
+/**
+ * Parses the RPC's ledger close time into unix seconds.
+ *
+ * `getLedgers` returns `ledgerCloseTime` as a *string of unix seconds*
+ * (`"1795767464"`). `new Date("1795767464")` is an Invalid Date, so the value
+ * must be coerced and multiplied by 1000 rather than handed to `Date` — a
+ * numeric ledger-close time is accepted too, so an SDK that switches the field
+ * to a number does not break this.
+ */
+function ledgerCloseTimeSeconds(raw: string | number): number {
+  const value =
+    typeof raw === 'number'
+      ? raw
+      : /^\d+$/.test(raw.trim())
+        ? Number(raw.trim())
+        : Number.NaN;
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new RelayError(`Soroban RPC returned an unusable ledger close time: '${String(raw)}'`);
+  }
+  return value;
+}
+
 /** Close time (ISO 8601) of a specific ledger, via RPC getLedgers. */
 export async function ledgerCloseTime(server: rpc.Server, ledgerSeq: number): Promise<string> {
   let response;
@@ -220,7 +290,7 @@ export async function ledgerCloseTime(server: rpc.Server, ledgerSeq: number): Pr
       `Soroban RPC returned no ledger ${ledgerSeq} (oldest available: ${response.oldestLedger})`,
     );
   }
-  return new Date(ledger.ledgerCloseTime).toISOString();
+  return new Date(ledgerCloseTimeSeconds(ledger.ledgerCloseTime) * 1000).toISOString();
 }
 
 export interface RelayResult {
@@ -351,6 +421,23 @@ export async function relayCycleRoot(opts: {
       `post_cycle_root transaction ${sent.hash} did not land: status=${confirmed.status}${ledger}; inspect the transaction on an explorer`,
     );
   }
+
+  // A SUCCESS status only proves the call executed. Read the cycle back and
+  // compare the stored root/amount before reporting the relay as complete —
+  // this is what makes "relayed" mean "the chain agrees with the manifest".
+  const onChain = await verifyPostedCycle({
+    server,
+    vault,
+    sourcePubkey: keypair.publicKey(),
+    networkPassphrase,
+    cycleId,
+    root,
+    totalAmount,
+  });
+  core.info(
+    `verified on-chain: cycle ${cycleId} root and total_amount match the manifest ` +
+      `(posted_at=${onChain.postedAt}, claims_started=${onChain.claimsStarted})`,
+  );
 
   return { hash: sent.hash, status: confirmed.status, ledger: confirmed.ledger };
 }

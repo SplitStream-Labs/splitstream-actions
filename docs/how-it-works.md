@@ -12,12 +12,14 @@ One workflow run closes one cycle. Everything below happens inside
 2. **Cycle window**. For a real run the boundary comes from this repo's own
    committed audit trail: `readLastManifestWindow()` (`src/manifest.ts`) finds
    the highest `manifests/cycle-<id>.json`, and the new cycle is that id + 1
-   starting at that manifest's `generatedAt`. The deployed contract has no
-   "latest cycle" call, so it can never define the window;
-   `get_cycle_info(lastCycleId)` is called only as a sanity check, and a
-   disagreement only produces a warning. When no manifest exists yet (cycle 0),
-   the `since` and `cycle_id` inputs supply the boundary instead, and both are
-   required.
+   starting at that manifest's `generatedAt`. Git history, not chain state, is
+   the source of truth for the window — the full splitstream-core vault has no
+   "latest cycle" call; `get_cycle_info(lastCycleId)` is called only as a sanity
+   check, and a disagreement only produces a warning. The reference vault in
+   [`contracts/vault/`](../contracts/vault/) does expose `get_latest_cycle`, so
+   the head of the cycle trail can also be read from chain state. When no
+   manifest exists yet (cycle 0), the `since` and `cycle_id` inputs supply the
+   boundary instead, and both are required.
 3. **Ingest**. `ingestCycle()` (`src/ingest.ts`) lists closed PRs in every repo
    in `repos` (`octokit.paginate(octokit.rest.pulls.list, { state: 'closed',
    per_page: 100 })`), keeps those whose `merged_at` is at or after the window
@@ -42,7 +44,16 @@ One workflow run closes one cycle. Everything below happens inside
    signs `post_cycle_root(cycle_id, root, total_amount)`, submits it via Soroban
    RPC, polls until the transaction lands, and fails the run if it does not.
    `total_amount` is the sum of the manifest's entry amounts — the pool minus
-   the dust remainder, not the pool.
+   the dust remainder, not the pool. After confirmation it reads
+   `get_cycle_info(cycle_id)` back and fails unless the stored `root` and
+   `total_amount` are byte-for-byte what was submitted, so a relay is never
+   reported as complete just because the transaction executed.
+9. **Claim (later, by contributors)**. 24 hours after the root is posted, a
+   contributor proves their `(address, amount)` leaf against the on-chain root
+   with `credit_claim`, which credits a pull-payment balance they then
+   `withdraw`. The contract in [`contracts/vault/`](../contracts/vault/) is the
+   reference implementation of this step; the leaf format it verifies is the one
+   step 6 produced.
 
 ## The payout rule
 

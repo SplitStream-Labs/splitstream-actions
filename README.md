@@ -21,18 +21,23 @@ distribution manifest committed to the repo as an audit trail, and relays the
 Merkle root of those payouts to the deployed [splitstream-core] contract.
 
 It runs as a GitHub Action on the contributor sprint boundary (weekly schedule) or
-manually. **This repo never holds funds** — it only computes and relays.
-Contributors then claim their share against that root with [splitstream-sdk-cli].
+manually. **The Action never holds funds** — it only computes and relays. The
+pool sits in the Soroban vault contract shipped in
+[`contracts/vault/`](contracts/vault/), and contributors claim their share
+against the root with [splitstream-sdk-cli].
 
 > Org-level settlement: an open-source team's approved work is often spread across
 > several repos under the same org (core contracts + app + tooling). SplitStream
 > settles at the org/treasury level — issues closed in **every repo listed in
 > `splitstream.yml`** are summed per contributor before shares are computed.
 
-> **Part of SplitStream** — this repo is one of three: [splitstream-core] (the
-> Soroban vault contract the root is relayed to), **splitstream-actions** (this
-> repo, the GitHub→chain bridge), and [splitstream-sdk-cli] (the client SDK and
-> CLI that reads the manifests this action writes).
+> **Part of SplitStream** — this repo is self-contained on the Soroban side: it
+> contains the GitHub→chain bridge (the Action) **and** a deployable Soroban
+> vault contract ([`contracts/vault/`](contracts/vault/)) that speaks the same
+> `post_cycle_root` / `get_cycle_info` ABI the relay targets. The full-featured
+> treasury contract with fixed splits, vesting and sweeps lives in
+> [splitstream-core]; [splitstream-sdk-cli] is the client SDK and CLI that reads
+> the manifests this action writes.
 
 ---
 
@@ -139,9 +144,81 @@ GITHUB_TOKEN / ORACLE_SECRET ┘                                                
    submits via Soroban RPC, **polls until the transaction lands**, and fails the
    run if it doesn't. Before any RPC call, the configured secret is asserted to
    resolve to the registry's `oracleAccount` — a mismatch fails loudly instead of
-   relaying from the wrong identity. The tx hash + ledger are written to the job
-   summary. An optional `FEE_BUMP_SECRET_KEY` wraps the tx in a fee bump when the
-   relay account's own balance is a concern.
+      relaying from the wrong identity. The tx hash + ledger are written to the job
+   summary. An optional `FEE_BUMP_SECRET_KEY` wraps the tx in a fee bump when
+   the relay account's own balance is a concern. Once the transaction lands, the
+   action reads `get_cycle_info(cycleId)` back and fails unless the stored root
+   and `total_amount` are exactly what it submitted — a `SUCCESS` status alone
+   does not prove the right vault stored the right root.
+
+## The Soroban contract in this repo
+
+[`contracts/vault/`](contracts/vault/) is a SEP-41 vault compiled to
+`wasm32v1-none`. It is the on-chain half of this pipeline: one Merkle root per
+cycle, and payouts only to contributors who can prove their
+`(address, amount)` leaf against it.
+
+| Function | Auth | What it does |
+|---|---|---|
+| `initialize(admin, oracle, token)` | admin | One-time wiring of the dispute authority, the CI relay key and the token. |
+| `deposit(from, amount)` | `from` | Pulls pooled funds into the vault. |
+| `post_cycle_root(cycle_id, root, total_amount)` | oracle | The exact call `src/relay.ts` submits. Rejects re-posts and non-increasing cycle ids. |
+| `challenge_and_replace_root(cycle_id, new_root, new_total)` | admin | One correction during the 24h dispute window, before any claim. |
+| `credit_claim(contributor, cycle_id, amount, proof)` | `contributor` | Verifies the sorted-pair Merkle proof and credits a pull-payment balance. Opens claims after 24h. |
+| `withdraw(contributor)` | `contributor` | Pays the credited balance (effects before interaction). |
+| `get_cycle_info`, `get_latest_cycle`, `get_balance`, `has_claimed`, `get_total_credited` | — | Read-only views. |
+
+The Rust tests pin the **same golden values** the TypeScript suite reads from
+`test/fixtures/merkle.golden.json` (the leaf hash and the 3- and 4-leaf roots),
+so a drift in either leaf hashing implementation fails CI: the contract cannot
+silently reject every claim.
+
+```bash
+cargo test --workspace          # contract + cross-language Merkle golden tests
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+stellar contract build --package splitstream-vault
+# -> target/wasm32v1-none/release/splitstream_vault.wasm
+```
+
+`stellar contract build` (stellar-cli v30, matching soroban-sdk 29) is required
+for the deployable artifact; a plain `cargo build --target wasm32v1-none` does
+not run the SDK's spec-shaking step.
+
+Deploy and initialize against testnet (any funded identity works):
+
+```bash
+stellar contract deploy \
+  --wasm target/wasm32v1-none/release/splitstream_vault.wasm \
+  --source-account <funded-identity> --network testnet \
+  --alias splitstream-vault
+
+stellar contract invoke --id <C...> --source-account <funded-identity> \
+  --network testnet -- initialize \
+  --admin <G...> --oracle <G...> --token <C...>
+```
+
+Then point `vaultContract` in `.github/splitstream.yml` at the deployed id.
+
+### Testnet deployment (bundled contract)
+
+A demo instance of this contract is live on testnet, so the code and its on-chain
+state can be inspected without building anything:
+
+| | |
+|---|---|
+| Contract | `CBW35L2YQUIPK32XZKT2DJLXU3YNI7KRAFV5WWPR7VF6GUUEINI3ABDN` |
+| Explorer | https://stellar.expert/explorer/testnet/contract/CBW35L2YQUIPK32XZKT2DJLXU3YNI7KRAFV5WWPR7VF6GUUEINI3ABDN |
+| WASM hash | `776755d65a12e971bda1c7f069dc1ef8a12a3aaa1d4ec316544741bbc1ebc06f` |
+| Deploy tx | https://stellar.expert/explorer/testnet/tx/031570ceaaa480a00cacdad15498686222fc4261b05ff70d3bc81702cd26fae7 |
+| Initialize tx | https://stellar.expert/explorer/testnet/tx/638a545ef7b3529b83d9e937f3706b3e155da7332d8118f009f729d5938208f8 |
+| Admin / oracle | `GARBYM726NP5J77WOXQXX6KDXJUPOVWJDVEVDLAR7XYSTFQPSJHP22IL` (throwaway) |
+| Token | `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` (native SAC) |
+
+This is a demo, not a treasury: its admin/oracle is a throwaway key that is not
+in this repo, it holds no funds, and no cycle has been posted
+(`get_latest_cycle` returns void). Deploy your own instance and initialize it
+with your own admin/oracle/token before pointing `vaultContract` at it.
 
 ## Configuration — `.github/splitstream.yml`
 
@@ -263,18 +340,20 @@ Tree construction: **sorted-pair Merkle tree** — at each level, children are
 paired left-to-right and concatenated in ascending byte order before hashing; an
 odd node is promoted unchanged. Leaves are ordered by **ascending stellar pubkey
 bytes** (deterministic, independent of handle casing), so the root is
-reproducible from the manifest alone. `splitstream-core`'s verifier must use the
-same leaf order and pair sorting.
+reproducible from the manifest alone. [`contracts/vault/src/merkle.rs`](contracts/vault/src/merkle.rs)
+implements exactly this and is pinned to the same fixture; a relocation or
+re-implementation of the contract must keep both.
 
 The cross-language golden test (`test/merkle.test.ts` +
 `test/fixtures/merkle.golden.json`) pins the leaf hash and tree roots; see
 [CONTRIBUTING.md](CONTRIBUTING.md#merkle-golden-fixture) for the verified
 2026-09-10 cross-check against splitstream-core's Rust test suite.
 
-## Contract interface (splitstream-core)
+## Contract interface (relay target)
 
 The one integration point with the deployed contract, isolated in
-[`src/relay.ts`](src/relay.ts):
+[`src/relay.ts`](src/relay.ts). Both
+[`contracts/vault/`](contracts/vault/) here and splitstream-core implement it:
 
 - `get_cycle_info(cycle_id: u64) -> Option<CycleInfo>` — one cycle's info,
   keyed by the id the caller supplies (the contract cannot enumerate cycles);
@@ -305,6 +384,12 @@ npm test           # unit tests only
 npm run test:integration  # gated testnet suite (skips unless gates are set)
 npm run typecheck
 npm run build      # ncc bundle -> dist/ (action runtime uses dist/index.js)
+
+# Soroban contract (Rust)
+cargo test --workspace
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+stellar contract build --package splitstream-vault
 ```
 
 Testnet integration tests are gated behind env flags — see

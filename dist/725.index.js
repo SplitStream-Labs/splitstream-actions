@@ -8,7 +8,7 @@ export const modules = {
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   sanitizeIdentifier: () => (/* binding */ sanitizeIdentifier)
 /* harmony export */ });
-/* unused harmony exports escapeStringLiteral, formatImports, formatJSDocComment, generateTypeImports, isNameReserved, isTupleStruct, parseTypeFromTypeDef, toCamelCase, toPascalCase */
+/* unused harmony exports escapeStringLiteral, formatImports, formatJSDocComment, generateTypeImports, isNameReserved, isTupleStruct, parseTypeFromTypeDef, propertyKey, toCamelCase, toPascalCase */
 function isNameReserved(name) {
   const reservedNames = [
     // Keywords
@@ -82,6 +82,12 @@ function sanitizeIdentifier(identifier) {
 }
 function escapeStringLiteral(str) {
   return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+}
+function propertyKey(rawName) {
+  return isIdentifier(rawName) ? rawName : `"${escapeStringLiteral(rawName)}"`;
+}
+function isIdentifier(name) {
+  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name);
 }
 function parseTypeFromTypeDef(typeDef, isFunctionInput = false) {
   switch (typeDef.type) {

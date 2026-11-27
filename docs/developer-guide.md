@@ -3,12 +3,15 @@
 ## Local setup
 
 Node 24. `.nvmrc` pins `24` and `package.json` sets `engines.node` to
-`>=24.0.0`; CI (`.github/workflows/ci.yml`) uses `node-version: 24`.
+`>=24.0.0`; CI (`.github/workflows/ci.yml`) uses `node-version: 24`. The Soroban
+contract needs Rust (stable, `wasm32v1-none`) and stellar-cli v30 — the toolchain
+pinned in `rust-toolchain.toml` is installed by `rustup` on first use.
 
 ```bash
 git clone https://github.com/Oyinkans0la12/splitstream-actions
 cd splitstream-actions
 npm install
+rustup target add wasm32v1-none   # already declared in rust-toolchain.toml
 ```
 
 | Command | Does |
@@ -18,7 +21,11 @@ npm install
 | `npm run test:watch` | vitest in watch mode. |
 | `npm run test:integration` | `vitest run test/relay.integration.test.ts` — gated, see below. |
 | `npm run build` | `ncc build src/index.ts -o dist` — the action bundle. |
-| `npm run check` | `typecheck` + `test` + `build`. This is exactly what CI runs on every push and PR to `main`. |
+| `npm run check` | `typecheck` + `test` + `build`. This is exactly what the Node CI job runs on every push and PR to `main`. |
+| `cargo test --workspace` | Contract unit tests, including the cross-language Merkle golden fixture. |
+| `cargo fmt --all -- --check` | Rust formatting gate. |
+| `cargo clippy --workspace --all-targets -- -D warnings` | Rust lint gate. |
+| `stellar contract build --package splitstream-vault` | The deployable wasm, `target/wasm32v1-none/release/splitstream_vault.wasm`. |
 
 `dist/` is deliberately not gitignored, because `action.yml` runs `dist/index.js`
 (`using: node24`, `main: dist/index.js`) and `uses: ./` resolves there. **Any
@@ -36,6 +43,9 @@ src/manifest.ts                floor payout formula + dust remainder + manifest 
 src/merkle.ts                  leaf XDR hashing + sorted-pair tree
 src/relay.ts                   Soroban RPC: cycle query, build/sign/submit/confirm
 schemas/splitstream.schema.ts  the zod registry schema
+Cargo.toml                     Rust workspace root
+contracts/vault/src/           the Soroban vault (lib, storage, merkle, claims)
+contracts/vault/src/test.rs    Rust tests incl. the shared golden Merkle fixture
 ```
 
 Unit suites cover `registry`, `counts`, `manifest`, `merkle` (golden), and
@@ -59,7 +69,9 @@ every root this repo relays is unclaimable.
 
 `test/merkle.test.ts` asserts all of these, plus that the i128 encoding matches
 the Rust SDK's `nativeToScVal` for amounts up to `2^127 - 1` and down to
-`-2^127`.
+`-2^127`. `contracts/vault/src/test.rs` asserts the same three values directly
+against `merkle::leaf_hash` / `hash_pair`, so the TypeScript producer and the
+Soroban verifier are pinned to one fixture.
 
 Procedure after any change to `src/merkle.ts`, or to splitstream-core's
 `merkle.rs`:
